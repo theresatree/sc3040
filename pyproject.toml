@@ -1,0 +1,20 @@
+[project]
+name = "sc3040"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "alembic>=1.19.1",
+    "fastapi[standard]>=0.141.1",
+    "insightface>=1.0.1",
+    "pgvector>=0.5.0",
+    "psycopg[binary]>=3.3.4",
+    "pwdlib[argon2]>=0.3.1",
+    "pyjwt>=2.13.0",
+    "sqlalchemy>=2.0.52",
+    "tqdm>=4.70.0",
+]
+
+[tool.fastapi]
+entrypoint = "app.main:app"

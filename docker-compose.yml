@@ -1,0 +1,31 @@
+services:
+  db:
+    image: pgvector/pgvector:pg18
+    environment:
+      POSTGRES_USER: sc3040
+      POSTGRES_PASSWORD: sc3040
+      POSTGRES_DB: app
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sc3040 -d app"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5433:5432"
+
+  api:
+    build: .
+    volumes:
+      - .:/app:Z
+      - /app/.venv
+      - ./ml_models:/app/ml_models:Z
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+volumes:
+  postgres_data:
