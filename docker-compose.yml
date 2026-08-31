@@ -20,7 +20,6 @@ services:
     volumes:
       - .:/app:Z
       - /app/.venv
-      - ./ml_models:/app/ml_models:Z
     depends_on:
       db:
         condition: service_healthy

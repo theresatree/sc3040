@@ -1,3 +1,4 @@
+from app.image import save_image
 from sqlalchemy.exc import IntegrityError
 from app.auth.password import hash_password
 from app.schemas.auth import RegisterRequest
@@ -61,7 +62,22 @@ async def register(
     # We need Depends for our RegisterRequest because we're asking FastAPI
     # to look at the individual params rather than the whole thing as a JSON
     image_bytes = await data.image.read()
+    if not image_bytes:
+        raise HTTPException(
+            status_code=400,
+            detail="Image is required",
+        )
+
     embeddings = process_face_image(request.app.state, image_bytes)
+
+    content_type = data.image.content_type
+    if content_type is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Image content type is required",
+        )
+
+    image_url = save_image(image_bytes, content_type)
 
     user = User(
             name=data.name, 
@@ -69,7 +85,8 @@ async def register(
             gender=data.gender,
             email=data.email,
             password_hash=hash_password(data.password),
-            face_embedding=embeddings
+            face_embedding=embeddings,
+            image_url=image_url
             )
     try:
         db.add(user)

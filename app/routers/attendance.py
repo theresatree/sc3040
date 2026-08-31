@@ -26,6 +26,12 @@ async def check_in(
         ):
 
     image_bytes = await data.image.read()
+    if not image_bytes:
+        raise HTTPException(
+            status_code=400,
+            detail="Image is required",
+        )
+
     embeddings = process_face_image(request.app.state, image_bytes)
 
     # Check based on DB

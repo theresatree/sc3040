@@ -1,4 +1,7 @@
+# ML models
 ml_models/
+# users' face
+uploads/ 
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
