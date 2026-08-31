@@ -1,8 +1,7 @@
 from sqlalchemy.exc import IntegrityError
 from app.auth.password import hash_password
-from app.db.enums import UserGender
 from app.schemas.auth import RegisterRequest
-from fastapi import APIRouter, Depends, HTTPException, Request, File, UploadFile, Form
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,9 +10,7 @@ from app.auth.jwt import create_access_token
 from app.auth.password import verify_password
 from app.db.database import get_db
 from app.db.models import User
-from app.db.enums import UserRole
 
-from app.ml.operations import get_face_embedding, check_spoofing
 from app.dependencies import process_face_image
 
 router = APIRouter(
@@ -57,33 +54,18 @@ async def login(
 
 @router.post("/register", status_code=201)
 async def register(
-    request: Request,
-    name: str = Form(...),
-    email: str = Form(...),
-    password: str = Form(...),
-    role: UserRole = Form(...),
-    gender: UserGender = Form(...),
-    image: UploadFile = File(...),
-    db: AsyncSession = Depends(get_db),
-):
-    # Apparently, we need to put in "Form" if we want to send JSON together with image
-
-    # I put this here just to validate the schema for pydantic purposes.
-    # pydantic will help us check for email validation
-    data = RegisterRequest(
-            name=name,
-            email=email,
-            password=password,
-            gender=gender,
-            role=role,
-            )
-    
-    image_bytes = await image.read()
+        request: Request,
+        data : RegisterRequest = Depends(),
+        db: AsyncSession = Depends(get_db),
+        ):
+    # We need Depends for our RegisterRequest because we're asking FastAPI
+    # to look at the individual params rather than the whole thing as a JSON
+    image_bytes = await data.image.read()
     embeddings = process_face_image(request.app.state, image_bytes)
 
     user = User(
             name=data.name, 
-            role=data.role,
+            role=data.role, # If not specified, default to student
             gender=data.gender,
             email=data.email,
             password_hash=hash_password(data.password),
@@ -96,8 +78,8 @@ async def register(
     except IntegrityError:
         await db.rollback()
         raise HTTPException(
-            status_code=409,
-            detail="Email already registered",
-        )
- 
+                status_code=409,
+                detail="Email already registered",
+                )
+
     return {"message": "User registered successfully"}
