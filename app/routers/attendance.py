@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import numpy as np
+from typing import Annotated
 
 from app.db.database import get_db
 from app.auth.dependencies import get_current_user_id
@@ -20,9 +21,9 @@ router = APIRouter(
 @router.post("/check-in", status_code=201)
 async def check_in(
         request: Request,
-        user_id: int = Depends(get_current_user_id),
-        data: CheckInRequest = Depends(),
-        db: AsyncSession = Depends(get_db),
+        user_id: Annotated[int, Depends(get_current_user_id)],
+        data: Annotated[CheckInRequest, Form()],
+        db: Annotated[AsyncSession, Depends(get_db)],
         ):
 
     image_bytes = await data.image.read()

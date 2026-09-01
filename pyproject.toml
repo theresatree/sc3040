@@ -6,15 +6,28 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "alembic>=1.19.1",
+    "asgi-lifespan>=2.1.0",
     "fastapi[standard]>=0.141.1",
     "insightface>=1.0.1",
     "pgvector>=0.5.0",
     "psycopg[binary]>=3.3.4",
     "pwdlib[argon2]>=0.3.1",
     "pyjwt>=2.13.0",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
     "sqlalchemy>=2.0.52",
+    "testcontainers-postgres>=0.0.1rc1",
+    "testcontainers[postgresql]>=4.15.0",
     "tqdm>=4.70.0",
 ]
 
 [tool.fastapi]
 entrypoint = "app.main:app"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+pythonpath = ["."]
+filterwarnings = [
+    "ignore::FutureWarning:insightface.*",
+    "ignore:transaction already deassociated from connection:sqlalchemy.exc.SAWarning",
+]

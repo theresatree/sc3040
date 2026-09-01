@@ -8,6 +8,7 @@ from app.db.database import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.dependencies import require_admin
 from fastapi import APIRouter, Depends, HTTPException
+from typing import Annotated
 
 from sqlalchemy import select
 
@@ -18,11 +19,11 @@ router = APIRouter(
 
 @router.get("/", status_code=200, response_model=list[TimetableResponse])
 async def get_all_timetable(
+        db: Annotated[AsyncSession, Depends(get_db)],
         day_of_week : DayOfWeek | None = None,
         room_id : str | None = None,
         professor_id : int | None = None,
         subject: str | None = None,
-        db: AsyncSession = Depends(get_db)
         ):
 
     query = select(Timetable).options(
@@ -46,7 +47,7 @@ async def get_all_timetable(
 @router.get("/{timetable_id}", status_code=200, response_model=TimetableResponse)
 async def get_timetable_by_id(
         timetable_id: int,
-        db: AsyncSession = Depends(get_db)
+        db: Annotated[AsyncSession, Depends(get_db)]
         ):
 
     result = await db.execute(
@@ -68,7 +69,7 @@ async def get_timetable_by_id(
 
 @router.get("/subjects", status_code=200, response_model=list[str])
 async def get_all_subjects(
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     result = await db.execute(
         select(Timetable.subject)
@@ -80,8 +81,8 @@ async def get_all_subjects(
 
 @router.get("/me", status_code=200, response_model=list[MyTimetableResponse])
 async def get_my_timetable(
-        user: User = Depends(require_admin),
-        db: AsyncSession = Depends(get_db)
+        user: Annotated[User, Depends(require_admin)],
+        db: Annotated[AsyncSession, Depends(get_db)]
         ):
 
     result = await db.execute(
@@ -93,8 +94,8 @@ async def get_my_timetable(
 @router.post("/", status_code=201)
 async def create_new_timetable(
         data: TimetableRequest,
-        user: User = Depends(require_admin),
-        db: AsyncSession = Depends(get_db)
+        user: Annotated[User, Depends(require_admin)],
+        db: Annotated[AsyncSession, Depends(get_db)]
         ):
 
     new_timetable = Timetable(
@@ -138,8 +139,8 @@ async def create_new_timetable(
 @router.delete("/{timetable_id}", status_code=204)
 async def delete_timetable_by_id(
         timetable_id: int,
-        user: User = Depends(require_admin),
-        db: AsyncSession = Depends(get_db)
+        user: Annotated[User, Depends(require_admin)],
+        db: Annotated[AsyncSession, Depends(get_db)]
         ):
 
     result = await db.execute(
@@ -163,8 +164,8 @@ async def delete_timetable_by_id(
 async def update_timetable_by_id(
         timetable_id: int,
         data: UpdateMyTimetableRequest,
-        user: User = Depends(require_admin),
-        db: AsyncSession = Depends(get_db)
+        user: Annotated[User, Depends(require_admin)],
+        db: Annotated[AsyncSession, Depends(get_db)]
         ):
 
     result = await db.execute(

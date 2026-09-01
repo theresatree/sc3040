@@ -2,6 +2,7 @@ from app.auth.dependencies import require_admin
 from app.db.database import get_db
 
 from fastapi import HTTPException, Depends, APIRouter
+from typing import Annotated
 from app.schemas.room import CreateRoomRequest, RoomDataResponse, UpdateRoomRequest
 
 from sqlalchemy import select
@@ -18,7 +19,7 @@ router = APIRouter(
 # All GET should be non-admin i think?
 @router.get("/", status_code=200, response_model=list[RoomDataResponse])
 async def get_all_rooms(
-        db : AsyncSession = Depends(get_db)
+        db: Annotated[AsyncSession, Depends(get_db)]
         ):
 
     result = await db.execute(
@@ -38,7 +39,7 @@ async def get_all_rooms(
 @router.get("/{room_id}", status_code=200, response_model=RoomDataResponse)
 async def get_room_by_id(
         room_id: str,
-        db : AsyncSession = Depends(get_db)
+        db: Annotated[AsyncSession, Depends(get_db)]
         ):
 
     result = await db.execute(
@@ -59,7 +60,7 @@ async def get_room_by_id(
 @router.post("/", status_code=201, response_model=RoomDataResponse,dependencies=[Depends(require_admin)])
 async def create_new_room(
         data: CreateRoomRequest,
-        db: AsyncSession = Depends(get_db)
+        db: Annotated[AsyncSession, Depends(get_db)]
         ):
 
     # Check room_id against database first.
@@ -86,7 +87,7 @@ async def create_new_room(
 @router.delete("/{room_id}", status_code=204, dependencies=[Depends(require_admin)])
 async def delete_room_by_id(
         room_id: str,
-        db: AsyncSession = Depends(get_db)
+        db: Annotated[AsyncSession, Depends(get_db)]
         ):
 
     result = await db.execute(
@@ -108,7 +109,7 @@ async def delete_room_by_id(
 async def update_room_by_id(
         room_id: str,
         data: UpdateRoomRequest,
-        db: AsyncSession = Depends(get_db)
+        db: Annotated[AsyncSession, Depends(get_db)]
         ):
 
     result = await db.execute(

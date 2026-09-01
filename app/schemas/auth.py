@@ -9,10 +9,13 @@ class LoginRequest(BaseModel):
 # Apparently because pydantic only works for JSON objects (application/json),
 # We need multipart/form-data if we are including upload file
 # Thus, we need Form and File
+
 class RegisterRequest(BaseModel):
-    name: str = Form(...)
-    email: EmailStr = Form(...)
-    password: str = Form(...)
-    role: UserRole | None = Form(UserRole.STUDENT) # Default to student
-    gender: UserGender = Form(...)
-    image: UploadFile = File(...)
+    # Plain fields; the route uses Annotated[RegisterRequest, Form()]
+    # to read them as multipart form data
+    name: str
+    email: EmailStr
+    password: str
+    role: UserRole | None = UserRole.STUDENT  # Default to student
+    gender: UserGender
+    image: UploadFile

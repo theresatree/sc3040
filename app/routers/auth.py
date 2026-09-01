@@ -1,8 +1,9 @@
 from app.image import save_face_image_crop
 from sqlalchemy.exc import IntegrityError
+from typing import Annotated
 from app.auth.password import hash_password
 from app.schemas.auth import RegisterRequest
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Form
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,7 +24,7 @@ router = APIRouter(
 @router.post("/login")
 async def login(
         data: LoginRequest,
-        db: AsyncSession = Depends(get_db),
+        db: Annotated[AsyncSession, Depends(get_db)],
 ):
     # Find user
     result = await db.execute(
@@ -56,11 +57,10 @@ async def login(
 @router.post("/register", status_code=201)
 async def register(
         request: Request,
-        data : RegisterRequest = Depends(),
-        db: AsyncSession = Depends(get_db),
+        data: Annotated[RegisterRequest, Form()],
+        db: Annotated[AsyncSession, Depends(get_db)],
         ):
-    # We need Depends for our RegisterRequest because we're asking FastAPI
-    # to look at the individual params rather than the whole thing as a JSON
+    # Annotated[RegisterRequest, Form()] reads each field as multipart form data
     image_bytes = await data.image.read()
     if not image_bytes:
         raise HTTPException(
@@ -69,13 +69,6 @@ async def register(
         )
 
     embeddings = process_face_image(request.app.state, image_bytes)
-
-    content_type = data.image.content_type
-    if content_type is None:
-        raise HTTPException(
-            status_code=400,
-            detail="Image content type is required",
-        )
 
     image_url = save_face_image_crop(image_bytes, request.app.state.detector)
 
@@ -98,5 +91,3 @@ async def register(
                 status_code=409,
                 detail="Email already registered",
                 )
-
-    return {"message": "User registered successfully"}

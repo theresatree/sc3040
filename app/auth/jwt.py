@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 import jwt
 
-SECRET_KEY = "SC3040" # Hardcode it, since no checks anyways.
+SECRET_KEY = "83deffea5dafad4f9d57569768f169f622a5ace94f3cfaeb7e26216f815072ed" # Hardcode it, since no checks anyways.
 ALGORITHM = "HS256"
 
 

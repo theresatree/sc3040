@@ -3,20 +3,12 @@ from uuid import uuid4
 
 import cv2
 import numpy as np
-from fastapi import UploadFile, HTTPException
+from fastapi import HTTPException
 
 from app.ml.operations import _crop_face
 
-
 UPLOAD_DIR = Path("uploads/users")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-
-ALLOWED_TYPES = {
-        "image/jpeg": ".jpg",
-        "image/png": ".png",
-        "image/webp": ".webp",
-        }
-
 
 def save_face_image_crop(image_bytes: bytes, detector, size: int = 256) -> str:
     """

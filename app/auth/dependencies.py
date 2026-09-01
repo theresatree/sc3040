@@ -4,6 +4,7 @@ from app.auth.jwt import decode_access_token
 
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from typing import Annotated
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,7 +17,7 @@ bearer_scheme = HTTPBearer()
 
 
 async def get_current_user_id(
-        credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+        credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
         ) -> int:
     try:
         token = credentials.credentials
@@ -32,8 +33,8 @@ async def get_current_user_id(
                 )
 
 async def get_current_user(
-        user_id: int = Depends(get_current_user_id),
-        db: AsyncSession = Depends(get_db),
+        user_id: Annotated[int, Depends(get_current_user_id)],
+        db: Annotated[AsyncSession, Depends(get_db)],
         ) -> User:
     result = await db.execute(
             select(User).where(User.id == user_id)
@@ -50,7 +51,7 @@ async def get_current_user(
     return user
 
 async def require_admin(
-        user: User = Depends(get_current_user),
+        user: Annotated[User, Depends(get_current_user)],
         ) -> User:
 
     if user.role == UserRole.STUDENT:

@@ -23,8 +23,8 @@ class User(Base):
     )
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
-    face_embedding: Mapped[list[float] | None] = mapped_column(Vector(512))
-    image_url: Mapped[str | None] = mapped_column(String(500))
+    face_embedding: Mapped[list[float]] = mapped_column(Vector(512))
+    image_url: Mapped[str] = mapped_column(String(500))
 
 class Room(Base):
     __tablename__ = "rooms"

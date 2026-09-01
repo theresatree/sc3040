@@ -6,7 +6,8 @@ from app.schemas.user import UserImageUpdateRquest
 from sqlalchemy.exc import IntegrityError
 from app.auth.password import hash_password, verify_password
 from app.schemas.user import UserPasswordUpdateRequest
-from fastapi import HTTPException, APIRouter, Depends
+from fastapi import HTTPException, APIRouter, Depends, Form
+from typing import Annotated
 
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,28 +26,22 @@ router = APIRouter(
 
 @router.get("/me", response_model=UserDataResponse, status_code=200)
 async def get_me(
-        user: User = Depends(get_current_user),
+        user: Annotated[User, Depends(get_current_user)],
         ):
     return user
 
 @router.get("/me/image", status_code=200)
 async def get_my_image(
-        user: User = Depends(get_current_user),
+        user: Annotated[User, Depends(get_current_user)],
         ):
-    if not user.image_url:
-        raise HTTPException(
-                status_code=404,
-                detail="Image not found",
-                )
-
     return FileResponse(user.image_url)
 
 # Users update their own password and/or face.
 @router.patch("/me/password", status_code=204)
 async def update_password(
-        user: User = Depends(get_current_user),
-        data: UserPasswordUpdateRequest = Depends(),
-        db: AsyncSession = Depends(get_db)
+        user: Annotated[User, Depends(get_current_user)],
+        data: Annotated[UserPasswordUpdateRequest, Form()],
+        db: Annotated[AsyncSession, Depends(get_db)]
         ):
 
     password_match = verify_password(data.curr_password, user.password_hash)
@@ -72,9 +67,9 @@ async def update_password(
 @router.patch("/me/image", status_code=204)
 async def update_image(
         request: Request,
-        user: User = Depends(get_current_user),
-        data: UserImageUpdateRquest = Depends(),
-        db: AsyncSession = Depends(get_db)
+        user: Annotated[User, Depends(get_current_user)],
+        data: Annotated[UserImageUpdateRquest, Form()],
+        db: Annotated[AsyncSession, Depends(get_db)]
         ):
 
     image_bytes = await data.image.read()
@@ -115,7 +110,7 @@ async def update_image(
 @router.get("/{id}", response_model=UserDataResponse, status_code=200, dependencies=[Depends(require_admin)])
 async def get_user_by_id(
         user_id: int,
-        db: AsyncSession = Depends(get_db)
+        db: Annotated[AsyncSession, Depends(get_db)]
         ):
 
     result = await db.execute(
@@ -136,7 +131,7 @@ async def get_user_by_id(
 @router.get("/{id}/image", status_code=200, dependencies=[Depends(require_admin)])
 async def get_user_image_by_id(
         user_id: int,
-        db: AsyncSession = Depends(get_db)
+        db: Annotated[AsyncSession, Depends(get_db)]
         ):
     result = await db.execute(
             select(User.image_url).where(User.id == user_id)
@@ -156,7 +151,7 @@ async def get_user_image_by_id(
 @router.delete("/{id}", status_code=204, dependencies=[Depends(require_admin)])
 async def delete_user_by_id(
         user_id: int,
-        db: AsyncSession = Depends(get_db)
+        db: Annotated[AsyncSession, Depends(get_db)]
         ):
 
     result = await db.execute(
