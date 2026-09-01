@@ -1,7 +1,11 @@
 from pathlib import Path
 from uuid import uuid4
 
+import cv2
+import numpy as np
 from fastapi import UploadFile, HTTPException
+
+from app.ml.operations import _crop_face
 
 
 UPLOAD_DIR = Path("uploads/users")
@@ -14,26 +18,44 @@ ALLOWED_TYPES = {
         }
 
 
-def save_image(image_bytes: bytes, content_type: str) -> str:
-    if content_type not in ALLOWED_TYPES:
+def save_face_image_crop(image_bytes: bytes, detector, size: int = 256) -> str:
+    """
+    We save it as 128x128, with 0.5x face size for padding around the face.
+    """
+    img = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), cv2.IMREAD_COLOR)
+    if img is None:
         raise HTTPException(
                 status_code=400,
-                detail="Unsupported image format",
+                detail="Invalid image",
                 )
 
-    if not image_bytes:
+    bboxes, _ = detector.detect(img)
+    if len(bboxes) == 0:
         raise HTTPException(
                 status_code=400,
-                detail="Image is empty",
+                detail="No face detected",
+                )
+    if len(bboxes) > 1:
+        raise HTTPException(
+                status_code=400,
+                detail="Multiple faces detected",
                 )
 
-    extension = ALLOWED_TYPES[content_type]
-    filename = f"{uuid4()}{extension}"
+    x1, y1, x2, y2 = bboxes[0][:4].astype(int)
+    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    crop = _crop_face(img_rgb, (x1, y1, x2, y2), expansion=1.5)
+    crop = cv2.resize(crop, (size, size), interpolation=cv2.INTER_LANCZOS4)
 
+    filename = f"{uuid4()}.jpg"
     path = UPLOAD_DIR / filename
 
-    with path.open("wb") as f:
-        f.write(image_bytes)
+    ok, buf = cv2.imencode(".jpg", cv2.cvtColor(crop, cv2.COLOR_RGB2BGR))
+    if not ok:
+        raise HTTPException(
+                status_code=500,
+                detail="Could not encode image",
+                )
+    path.write_bytes(buf.tobytes())
 
     return str(path)
 

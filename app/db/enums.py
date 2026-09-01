@@ -8,3 +8,10 @@ class UserRole(str, Enum):
 class UserGender(str, Enum):
     MALE = "male"
     FEMALE = "female"
+
+class DayOfWeek(str, Enum):
+    MONDAY = "monday"
+    TUESDAY = "tuesday"
+    WEDNESDAY = "wednesday"
+    THURSDAY = "thursday"
+    FRIDAY = "friday"

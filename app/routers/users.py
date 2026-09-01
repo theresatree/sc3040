@@ -1,4 +1,4 @@
-from app.image import delete_image, save_image
+from app.image import delete_image,save_face_image_crop 
 from fastapi.responses import FileResponse
 from fastapi import Request
 from app.dependencies import process_face_image
@@ -86,14 +86,8 @@ async def update_image(
                 )
 
     embeddings = process_face_image(request.app.state, image_bytes)
-    content_type = data.image.content_type
-    if content_type is None:
-        raise HTTPException(
-                status_code=400,
-                detail="Image content type is required",
-                )
 
-    image_url = save_image(image_bytes, content_type)
+    image_url = save_face_image_crop(image_bytes, request.app.state.detector)
     old_image_url = user.image_url
     user.face_embedding = embeddings
     user.image_url=image_url

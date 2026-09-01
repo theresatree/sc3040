@@ -51,10 +51,11 @@ async def get_current_user(
 
 async def require_admin(
         user: User = Depends(get_current_user),
-        ) -> None:
+        ) -> User:
 
     if user.role == UserRole.STUDENT:
         raise HTTPException(
                 status_code=403,
                 detail="Student access denied",
                 )
+    return user

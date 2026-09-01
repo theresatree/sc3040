@@ -1,4 +1,4 @@
-from app.image import save_image
+from app.image import save_face_image_crop
 from sqlalchemy.exc import IntegrityError
 from app.auth.password import hash_password
 from app.schemas.auth import RegisterRequest
@@ -77,7 +77,7 @@ async def register(
             detail="Image content type is required",
         )
 
-    image_url = save_image(image_bytes, content_type)
+    image_url = save_face_image_crop(image_bytes, request.app.state.detector)
 
     user = User(
             name=data.name, 

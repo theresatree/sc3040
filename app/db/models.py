@@ -1,10 +1,10 @@
-from datetime import date, datetime
+from datetime import date, datetime, time
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import ForeignKey, String
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy import Enum as SQLEnum
-from .enums import UserRole, UserGender
+from .enums import UserRole, UserGender, DayOfWeek
 
 class Base(DeclarativeBase):
     pass
@@ -29,9 +29,10 @@ class User(Base):
 class Room(Base):
     __tablename__ = "rooms"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    x: Mapped[float]
-    y: Mapped[float]
+    id: Mapped[str] = mapped_column(String(50),primary_key=True)
+    name: Mapped[str] = mapped_column(String(255))
+    latitude: Mapped[float]
+    longitude: Mapped[float]
     capacity: Mapped[int]
 
 
@@ -40,33 +41,45 @@ class Timetable(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     subject: Mapped[str] = mapped_column(String(100))
-    start: Mapped[datetime]
-    end: Mapped[datetime]
-    room_id: Mapped[int] = mapped_column(ForeignKey("rooms.id"))
+    start: Mapped[time]
+    end: Mapped[time]
+    day_of_week: Mapped[DayOfWeek] = mapped_column(
+        SQLEnum(DayOfWeek, name="day_of_week")
+    )
+    professor_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", name="timetables_professor_id_fkey")
+    )
 
+    room_id: Mapped[str] = mapped_column(
+        ForeignKey("rooms.id", name="timetables_room_id_fkey")
+    )
+
+    professor: Mapped["User"] = relationship()
+    room: Mapped["Room"] = relationship()
 
 class Registered(Base):
     __tablename__ = "registered"
 
     user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id"),
+        ForeignKey("users.id", name="registered_user_id_fkey"),
         primary_key=True,
     )
     timetable_id: Mapped[int] = mapped_column(
-        ForeignKey("timetables.id"),
+        ForeignKey("timetables.id", name="registered_timetable_id_fkey"),
         primary_key=True,
     )
+
 
 class Attendance(Base):
     __tablename__ = "attendance"
 
     user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id"),
+        ForeignKey("users.id", name="attendance_user_id_fkey"),
         primary_key=True,
     )
 
     timetable_id: Mapped[int] = mapped_column(
-        ForeignKey("timetables.id"),
+        ForeignKey("timetables.id", name="attendance_timetable_id_fkey"),
         primary_key=True,
     )
 
