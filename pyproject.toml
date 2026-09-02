@@ -3,11 +3,12 @@ name = "sc3040"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.13"
 dependencies = [
     "alembic>=1.19.1",
     "asgi-lifespan>=2.1.0",
     "fastapi[standard]>=0.141.1",
+    "greenlet>=3.5.5",
     "insightface>=1.0.1",
     "pgvector>=0.5.0",
     "psycopg[binary]>=3.3.4",

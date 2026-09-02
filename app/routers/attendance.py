@@ -1,15 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Form
+from fastapi import APIRouter, Depends, HTTPException, Request, Form, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import numpy as np
-from typing import Annotated
 
 from app.db.database import get_db
 from app.auth.dependencies import get_current_user_id
 from app.dependencies import process_face_image
 from app.db.models import User
 
-from app.schemas.attendance import CheckInRequest
 
 
 router = APIRouter(
@@ -21,12 +19,12 @@ router = APIRouter(
 @router.post("/check-in", status_code=201)
 async def check_in(
         request: Request,
-        user_id: Annotated[int, Depends(get_current_user_id)],
-        data: Annotated[CheckInRequest, Form()],
-        db: Annotated[AsyncSession, Depends(get_db)],
+        user_id: int = Depends(get_current_user_id),
+        image: UploadFile = Form(...),
+        db: AsyncSession = Depends(get_db),
         ):
 
-    image_bytes = await data.image.read()
+    image_bytes = await image.read()
     if not image_bytes:
         raise HTTPException(
             status_code=400,

@@ -1,13 +1,11 @@
-from app.image import save_face_image_crop
-from sqlalchemy.exc import IntegrityError
 from typing import Annotated
+from app.image import delete_image, save_face_image_crop
+from sqlalchemy.exc import IntegrityError
 from app.auth.password import hash_password
-from app.schemas.auth import RegisterRequest
+from app.schemas.auth import LoginRequest, RegisterRequest
 from fastapi import APIRouter, Depends, HTTPException, Request, Form
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.schemas.auth import LoginRequest
 from app.auth.jwt import create_access_token
 from app.auth.password import verify_password
 from app.db.database import get_db
@@ -24,7 +22,7 @@ router = APIRouter(
 @router.post("/login")
 async def login(
         data: LoginRequest,
-        db: Annotated[AsyncSession, Depends(get_db)],
+        db: AsyncSession = Depends(get_db),
 ):
     # Find user
     result = await db.execute(
@@ -57,10 +55,10 @@ async def login(
 @router.post("/register", status_code=201)
 async def register(
         request: Request,
-        data: Annotated[RegisterRequest, Form()],
-        db: Annotated[AsyncSession, Depends(get_db)],
+        data: RegisterRequest = Form(..., media_type="multipart/form-data"),
+        db: AsyncSession = Depends(get_db),
         ):
-    # Annotated[RegisterRequest, Form()] reads each field as multipart form data
+
     image_bytes = await data.image.read()
     if not image_bytes:
         raise HTTPException(
@@ -87,6 +85,7 @@ async def register(
         await db.refresh(user)
     except IntegrityError:
         await db.rollback()
+        delete_image(image_url)
         raise HTTPException(
                 status_code=409,
                 detail="Email already registered",

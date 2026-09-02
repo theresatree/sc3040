@@ -8,8 +8,20 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from app.main import app
 from app.db.database import get_db
 from app.db.models import Base
+import app.image as image_module
 
 from testcontainers.postgres import PostgresContainer
+
+@pytest.fixture(scope="session", autouse=True)
+def cleanup_uploads(tmp_path_factory):
+    # Register saves face crops into UPLOAD_DIR during tests: redirect it to a
+    # session temp dir (auto-deleted by pytest) so tests never touch the real
+    # uploads/ folder.
+    original = image_module.UPLOAD_DIR
+    image_module.UPLOAD_DIR = tmp_path_factory.mktemp("users_uploads")
+    yield
+    image_module.UPLOAD_DIR = original
+
 
 @pytest.fixture(scope="session")
 def postgres_container():
@@ -92,7 +104,7 @@ async def registered_user(client):
             data=payload,
             files={"image": (IMAGE_PATH.name, f, "image/jpeg")},
         )
-    assert response.status_code == 201
+    assert response.status_code == 201, response.json()
     return payload
 
 @pytest_asyncio.fixture()

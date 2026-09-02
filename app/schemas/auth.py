@@ -6,16 +6,15 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
-# Apparently because pydantic only works for JSON objects (application/json),
-# We need multipart/form-data if we are including upload file
-# Thus, we need Form and File
+# For multipart form data with a file, declare ALL fields (incl. the file)
+# inside the model and use Form(media_type="multipart/form-data") in the route
+# (not Annotated - it would advertise urlencoded and break Swagger UI).
 
 class RegisterRequest(BaseModel):
-    # Plain fields; the route uses Annotated[RegisterRequest, Form()]
-    # to read them as multipart form data
-    name: str
-    email: EmailStr
-    password: str
-    role: UserRole | None = UserRole.STUDENT  # Default to student
-    gender: UserGender
-    image: UploadFile
+    name: str = Form(...)
+    email: EmailStr = Form(...)
+    password: str = Form(...)
+    role: UserRole | None = Form(UserRole.STUDENT)
+    gender: UserGender = Form(...)
+    image: UploadFile = File(...)
+    model_config = {"extra": "forbid"}

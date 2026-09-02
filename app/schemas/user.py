@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from fastapi import UploadFile
+from fastapi import UploadFile, File
 
 class UserDataResponse(BaseModel):
     name: str
@@ -12,4 +12,4 @@ class UserPasswordUpdateRequest(BaseModel):
     password: str
 
 class UserImageUpdateRquest(BaseModel):
-    image: UploadFile
+    image: UploadFile = File(...)
