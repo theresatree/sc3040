@@ -47,6 +47,12 @@ async def get_current_user(
                 detail="User not found",
                 )
 
+    if not user.is_active:
+        raise HTTPException(
+            status_code=403,
+            detail="User account is deactivated",
+        )
+
     return user
 
 async def require_admin(
@@ -59,3 +65,15 @@ async def require_admin(
                 detail="Student access denied",
                 )
     return user
+
+async def require_student(
+        user: User = Depends(get_current_user)
+        ) -> User:
+
+    if user.role != UserRole.STUDENT:
+        raise HTTPException(
+                status_code=403,
+                detail="Student access only",
+                )
+    return user
+

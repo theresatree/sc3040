@@ -18,7 +18,7 @@ dependencies = [
     "pytest-asyncio>=1.4.0",
     "sqlalchemy>=2.0.52",
     "testcontainers-postgres>=0.0.1rc1",
-    "testcontainers[postgresql]>=4.15.0",
+    "testcontainers[postgres,postgresql]>=4.15.0",
     "tqdm>=4.70.0",
 ]
 

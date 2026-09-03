@@ -16,15 +16,16 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100))
     role: Mapped[UserRole] = mapped_column(
-        SQLEnum(UserRole, name="user_role")
-        )
+            SQLEnum(UserRole, name="user_role")
+            )
     gender: Mapped[UserGender] = mapped_column(
-        SQLEnum(UserGender, name="user_gender")
-    )
+            SQLEnum(UserGender, name="user_gender")
+            )
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     face_embedding: Mapped[list[float]] = mapped_column(Vector(512))
     image_url: Mapped[str] = mapped_column(String(500))
+    is_active: Mapped[bool] = mapped_column(default=True)
 
 class Room(Base):
     __tablename__ = "rooms"
@@ -44,15 +45,15 @@ class Timetable(Base):
     start: Mapped[time]
     end: Mapped[time]
     day_of_week: Mapped[DayOfWeek] = mapped_column(
-        SQLEnum(DayOfWeek, name="day_of_week")
-    )
+            SQLEnum(DayOfWeek, name="day_of_week")
+            )
     professor_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", name="timetables_professor_id_fkey")
-    )
+            ForeignKey("users.id", name="timetables_professor_id_fkey")
+            )
 
     room_id: Mapped[str] = mapped_column(
-        ForeignKey("rooms.id", name="timetables_room_id_fkey")
-    )
+            ForeignKey("rooms.id", name="timetables_room_id_fkey")
+            )
 
     professor: Mapped["User"] = relationship()
     room: Mapped["Room"] = relationship()
@@ -61,32 +62,35 @@ class Registered(Base):
     __tablename__ = "registered"
 
     user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", name="registered_user_id_fkey"),
-        primary_key=True,
-    )
+            ForeignKey("users.id", name="registered_user_id_fkey"),
+            primary_key=True,
+            )
     timetable_id: Mapped[int] = mapped_column(
-        ForeignKey("timetables.id", name="registered_timetable_id_fkey"),
-        primary_key=True,
-    )
+            ForeignKey(
+                "timetables.id",
+                name="registered_timetable_id_fkey",
+                ondelete="CASCADE",
+                )
+            )
 
 
 class Attendance(Base):
     __tablename__ = "attendance"
 
     user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", name="attendance_user_id_fkey"),
-        primary_key=True,
-    )
+            ForeignKey("users.id", name="attendance_user_id_fkey"),
+            primary_key=True,
+            )
 
     timetable_id: Mapped[int] = mapped_column(
-        ForeignKey("timetables.id", name="attendance_timetable_id_fkey"),
-        primary_key=True,
-    )
+            ForeignKey("timetables.id", name="attendance_timetable_id_fkey"),
+            primary_key=True,
+            )
 
     checked_in_date: Mapped[date] = mapped_column(
-        primary_key=True,
-    )
+            primary_key=True,
+            )
 
     checked_in_at: Mapped[datetime] = mapped_column(
-        default=datetime.utcnow,
-    )
+            default=datetime.utcnow,
+            )

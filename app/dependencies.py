@@ -1,4 +1,5 @@
 from fastapi import HTTPException
+import base64
 
 from app.ml.operations import get_face_embedding, check_spoofing
 
@@ -33,3 +34,7 @@ def process_face_image(state, image_bytes: bytes) -> list[float]:
         )
 
     return embeddings
+
+def image_to_base64(path: str) -> str:
+    with open(path, "rb") as f:
+        return base64.b64encode(f.read()).decode("utf-8")

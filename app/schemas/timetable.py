@@ -6,10 +6,15 @@ from app.db.enums import DayOfWeek
 class RoomResponse(BaseModel):
     id: str
     name: str
+    capacity: int
+
+    model_config = ConfigDict(from_attributes=True)
 
 class ProfessorResponse(BaseModel):
     id: int
     name: str
+
+    model_config = ConfigDict(from_attributes=True)
 
 class TimetableResponse(BaseModel):
     id: int
@@ -19,6 +24,7 @@ class TimetableResponse(BaseModel):
     day_of_week: DayOfWeek
     professor: ProfessorResponse
     room: RoomResponse
+    registered_count: int
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -29,6 +35,7 @@ class MyTimetableResponse(BaseModel):
     end: time
     day_of_week: DayOfWeek
     room: RoomResponse
+    registered_count: int
 
     model_config = ConfigDict(from_attributes=True)
 

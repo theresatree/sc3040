@@ -12,7 +12,7 @@ from app.db.models import User
 
 router = APIRouter(
     prefix="/attendance",
-    tags=["attendance"],
+    tags=["Check in to class"],
 )
 
 

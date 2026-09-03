@@ -12,7 +12,7 @@ from app.db.models import Room
 
 router = APIRouter(
     prefix="/rooms",
-    tags=["rooms"],
+    tags=["Tutorial Rooms/Lecture Theatre"],
 )
 
 # All GET should be non-admin i think?
@@ -35,14 +35,14 @@ async def get_all_rooms(
 
     return rooms
 
-@router.get("/{room_id}", status_code=200, response_model=RoomDataResponse)
+@router.get("/{id}", status_code=200, response_model=RoomDataResponse)
 async def get_room_by_id(
-        room_id: str,
+        id: str,
         db : AsyncSession = Depends(get_db)
         ):
 
     result = await db.execute(
-            select(Room).where(Room.id == room_id)
+            select(Room).where(Room.id == id)
             )
 
     room = result.scalar_one_or_none()
@@ -62,7 +62,7 @@ async def create_new_room(
         db: AsyncSession = Depends(get_db)
         ):
 
-    # Check room_id against database first.
+    # Check id against database first.
     room = Room(
             id = data.id,
             name = data.name,
@@ -83,14 +83,14 @@ async def create_new_room(
                 )
     return room
 
-@router.delete("/{room_id}", status_code=204, dependencies=[Depends(require_admin)])
+@router.delete("/{id}", status_code=204, dependencies=[Depends(require_admin)])
 async def delete_room_by_id(
-        room_id: str,
+        id: str,
         db: AsyncSession = Depends(get_db)
         ):
 
     result = await db.execute(
-            select(Room).where(Room.id == room_id)
+            select(Room).where(Room.id == id)
             )
 
     room = result.scalar_one_or_none()
@@ -104,15 +104,15 @@ async def delete_room_by_id(
     await db.delete(room)
     await db.commit()
 
-@router.patch("/{room_id}", status_code=200, response_model=RoomDataResponse, dependencies=[Depends(require_admin)])
+@router.patch("/{id}", status_code=200, response_model=RoomDataResponse, dependencies=[Depends(require_admin)])
 async def update_room_by_id(
-        room_id: str,
+        id: str,
         data: UpdateRoomRequest,
         db: AsyncSession = Depends(get_db)
         ):
 
     result = await db.execute(
-            select(Room).where(Room.id==room_id)
+            select(Room).where(Room.id==id)
             )
 
     room = result.scalar_one_or_none()

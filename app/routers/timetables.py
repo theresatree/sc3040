@@ -1,3 +1,4 @@
+from app.db.models import Registered
 from app.schemas.timetable import UpdateMyTimetableRequest
 from sqlalchemy.orm import selectinload
 from app.db.enums import DayOfWeek
@@ -9,55 +10,117 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.dependencies import require_admin
 from fastapi import APIRouter, Depends, HTTPException
 
-from sqlalchemy import select
+from sqlalchemy import select, or_, func
 
 router = APIRouter(
     prefix="/timetables",
-    tags=["timetables"],
+    tags=["Timetable slots"],
 )
 
-@router.get("/", status_code=200, response_model=list[TimetableResponse])
+# TODO: Timetable return capacity + registered.
+
+@router.get("/", status_code=200, response_model=list[TimetableResponse], description="Get all timetable created by professors, query is non-case sensitive and partial matching")
 async def get_all_timetable(
         day_of_week : DayOfWeek | None = None,
         room_id : str | None = None,
-        professor_id : int | None = None,
+        professor_name : str | None = None,
         subject: str | None = None,
         db: AsyncSession = Depends(get_db)
         ):
 
-    query = select(Timetable).options(
-        selectinload(Timetable.professor),
-        selectinload(Timetable.room),
+    query = (
+        select(
+            Timetable,
+            func.count(Registered.user_id).label("registered_count"),
+        )
+        .outerjoin(
+            Registered,
+            Registered.timetable_id == Timetable.id,
+        )
+        .options(
+            selectinload(Timetable.professor),
+            selectinload(Timetable.room),
+        )
+        .group_by(Timetable.id)
     )
+
     if day_of_week is not None:
         query = query.where(Timetable.day_of_week == day_of_week)
+
     if room_id is not None:
-        query = query.where(Timetable.room_id == room_id)
-    if professor_id is not None:
-        query = query.where(Timetable.professor_id == professor_id)
+        query = query.where(Timetable.room_id.ilike(f"%{room_id}"))
+
+    if professor_name is not None:
+        query = query.join(Timetable.professor).where(
+            User.name.ilike(f"%{professor_name}%")
+        )
+
     if subject is not None:
-        query = query.where(Timetable.subject == subject)
+        query = query.where(
+            Timetable.subject.ilike(f"%{subject}%")
+        )
 
     result = await db.execute(query)
+    rows = result.all()
 
-    return result.scalars().all()
+    return [
+        TimetableResponse(
+            id=timetable.id,
+            subject=timetable.subject,
+            start=timetable.start,
+            end=timetable.end,
+            day_of_week=timetable.day_of_week,
+            professor=timetable.professor,
+            room=timetable.room,
+            registered_count=registered_count,
+            )
+        for timetable, registered_count in rows
+        ]
 
-@router.get("/me", status_code=200, response_model=list[MyTimetableResponse])
+@router.get("/me", status_code=200, response_model=list[MyTimetableResponse], description="Professor only use. Get timetable created by myself")
 async def get_my_timetable(
         user: User = Depends(require_admin),
         db: AsyncSession = Depends(get_db)
         ):
 
     result = await db.execute(
-            select(Timetable).where(Timetable.professor_id == user.id).options(selectinload(Timetable.room))
-            )
+        select(
+            Timetable,
+            func.count(Registered.user_id).label("registered_count"),
+        )
+        .outerjoin(
+            Registered,
+            Registered.timetable_id == Timetable.id,
+        )
+        .where(
+            Timetable.professor_id == user.id
+        )
+        .options(
+            selectinload(Timetable.room),
+        )
+        .group_by(Timetable.id)
+    )
 
-    return result.scalars().all()
+    rows = result.all()
 
-@router.get("/subjects", status_code=200, response_model=list[str])
+    return [
+        MyTimetableResponse(
+            id=timetable.id,
+            subject=timetable.subject,
+            start=timetable.start,
+            end=timetable.end,
+            day_of_week=timetable.day_of_week,
+            room=timetable.room,
+            registered_count=registered_count,
+        )
+        for timetable, registered_count in rows
+    ]
+
+@router.get("/subjects", status_code=200, response_model=list[str], description="Get all collated subjects available")
 async def get_all_subjects(
         db: AsyncSession = Depends(get_db)
 ):
+
     result = await db.execute(
         select(Timetable.subject)
         .distinct()
@@ -67,32 +130,54 @@ async def get_all_subjects(
     return result.scalars().all()
 
 
-@router.get("/{timetable_id}", status_code=200, response_model=TimetableResponse)
+@router.get("/{id}", status_code=200, response_model=TimetableResponse, description="Get timetable based on ID")
 async def get_timetable_by_id(
-        timetable_id: int,
+        id: int,
         db: AsyncSession = Depends(get_db)
         ):
 
     result = await db.execute(
-            select(Timetable)
-            .where(Timetable.id == timetable_id)
-            .options(selectinload(Timetable.professor), selectinload(Timetable.room))
-            )
+        select(
+            Timetable,
+            func.count(Registered.user_id).label("registered_count"),
+        )
+        .outerjoin(
+            Registered,
+            Registered.timetable_id == Timetable.id,
+        )
+        .where(Timetable.id == id)
+        .options(
+            selectinload(Timetable.professor),
+            selectinload(Timetable.room),
+        )
+        .group_by(Timetable.id)
+    )
 
-    timetable = result.scalar_one_or_none()
+    row = result.one_or_none()
 
-    if not timetable:
+    if row is None:
         raise HTTPException(
-                status_code=404,
-                detail="Timetable not found"
-                )
+            status_code=404,
+            detail="Timetable not found",
+        )
 
-    return timetable
+    timetable, registered_count = row
+
+    return TimetableResponse(
+        id=timetable.id,
+        subject=timetable.subject,
+        start=timetable.start,
+        end=timetable.end,
+        day_of_week=timetable.day_of_week,
+        professor=timetable.professor,
+        room=timetable.room,
+        registered_count=registered_count,
+    )
 
 
 
 
-@router.post("/", status_code=201)
+@router.post("/", status_code=201, description="Professor use only. Create new timetable slot based on available room and time.")
 async def create_new_timetable(
         data: TimetableRequest,
         user: User = Depends(require_admin),
@@ -110,10 +195,13 @@ async def create_new_timetable(
 
     result = await db.execute(
             select(Timetable).where(
-                Timetable.room_id == data.room_id,
                 Timetable.day_of_week == data.day_of_week,
                 Timetable.start < data.end,
                 Timetable.end > data.start,
+                or_(
+                    Timetable.room_id == data.room_id,
+                    Timetable.professor_id == user.id,
+                    ),
                 )
             )
 
@@ -122,7 +210,7 @@ async def create_new_timetable(
     if collision:
         raise HTTPException(
             status_code=409,
-            detail="Room is already booked during this time",
+            detail="Room or professor is already booked during this time",
         )
 
     try:
@@ -137,9 +225,9 @@ async def create_new_timetable(
                 )
 
 
-@router.delete("/{timetable_id}", status_code=204)
+@router.delete("/{id}", status_code=204, description="Professor use only. Delete OWN timetable slot based on ID")
 async def delete_timetable_by_id(
-        timetable_id: int,
+        id: int,
         user: User = Depends(require_admin),
         db: AsyncSession = Depends(get_db)
         ):
@@ -147,7 +235,7 @@ async def delete_timetable_by_id(
     result = await db.execute(
             select(Timetable)
             .where(Timetable.professor_id == user.id)
-            .where(Timetable.id == timetable_id)
+            .where(Timetable.id == id)
             )
     
     delete = result.scalar_one_or_none()
@@ -161,26 +249,40 @@ async def delete_timetable_by_id(
     await db.delete(delete)
     await db.commit()
 
-@router.patch("/{timetable_id}", status_code=200)
+@router.patch("/{id}", status_code=200, description="Professor use only. Update OWN timetable slot based on ID. Cannot update if there's students registered")
 async def update_timetable_by_id(
-        timetable_id: int,
+        id: int,
         data: UpdateMyTimetableRequest,
         user: User = Depends(require_admin),
         db: AsyncSession = Depends(get_db)
         ):
 
     result = await db.execute(
-            select(Timetable)
-            .where(Timetable.id==timetable_id)
-            .where(Timetable.professor_id==user.id)
+            select(Timetable).where(
+                Timetable.id == id,
+                Timetable.professor_id == user.id,
+                )
             )
 
     timetable = result.scalar_one_or_none()
 
-    if not timetable:
+    if timetable is None:
         raise HTTPException(
                 status_code=404,
-                detail="Timetable not found"
+                detail="Timetable not found",
+                )
+
+    # Cannot update if any students are registered
+    registration = await db.scalar(
+            select(Registered).where(
+                Registered.timetable_id == id
+                )
+            )
+
+    if registration is not None:
+        raise HTTPException(
+                status_code=409,
+                detail="Cannot update timetable with existing registrations",
                 )
 
     # We need check for collision first.
@@ -201,7 +303,7 @@ async def update_timetable_by_id(
             Timetable.day_of_week == new_day,
             Timetable.start < new_end,
             Timetable.end > new_start,
-            Timetable.id != timetable_id,
+            Timetable.id != id,
         )
     )
 

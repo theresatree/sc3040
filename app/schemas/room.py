@@ -1,4 +1,4 @@
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, Field
 
 class RoomDataResponse(BaseModel):
     id: str
@@ -13,7 +13,7 @@ class CreateRoomRequest(BaseModel):
     name: str
     longitude: float
     latitude: float
-    capacity: int
+    capacity: int = Field(gt=0)
 
     @field_validator("id")
     @classmethod

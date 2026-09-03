@@ -1,5 +1,7 @@
+from app.dependencies import image_to_base64
+from app.db.enums import UserRole
+from app.db.models import Registered
 from app.image import delete_image,save_face_image_crop 
-from fastapi.responses import FileResponse
 from app.dependencies import process_face_image
 from app.schemas.user import UserImageUpdateRquest
 from sqlalchemy.exc import IntegrityError
@@ -9,7 +11,7 @@ from fastapi import HTTPException, APIRouter, Depends, Request
 
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete
 
 from app.auth.dependencies import get_current_user, require_admin
 from app.schemas.user import UserDataResponse
@@ -18,24 +20,49 @@ from app.db.database import get_db
 
 router = APIRouter(
         prefix="/users",
-        tags=["users"],
+        tags=["User Operations"],
         )
 
+# ADMIN/STAFF ONLY
+@router.get("/", response_model=list[UserDataResponse], status_code=200, dependencies=[Depends(require_admin)], description="Professor only. Get all users")
+async def get_all_users(
+        role: UserRole | None = None,
+        db: AsyncSession = Depends(get_db)
+        ):
 
-@router.get("/me", response_model=UserDataResponse, status_code=200)
+    query = select(User).where(User.is_active == True)
+
+    if role is not None:
+        query = query.where(User.role == role)
+
+    result = await db.execute(query)
+    users = result.scalars().all()
+
+    return [
+        UserDataResponse(
+            name=user.name,
+            role=user.role,
+            gender=user.gender,
+            email=user.email,
+            image=f"data:image/jpeg;base64,{image_to_base64(user.image_url)}",
+        )
+        for user in users
+    ]
+
+@router.get("/me", response_model=UserDataResponse, status_code=200, description="Get current user's information")
 async def get_me(
         user: User = Depends(get_current_user),
         ):
-    return user
+    
+    return UserDataResponse(
+            name=user.name,
+            role=user.role,
+            gender=user.gender,
+            email=user.email,
+            image=f"data:image/jpeg;base64,{image_to_base64(user.image_url)}",
+        )
 
-@router.get("/me/image", status_code=200)
-async def get_my_image(
-        user: User = Depends(get_current_user),
-        ):
-    return FileResponse(user.image_url)
-
-# Users update their own password and/or face.
-@router.patch("/me/password", status_code=204)
+@router.patch("/me/password", status_code=204, description="Update current user's password")
 async def update_password(
         user: User = Depends(get_current_user),
         data: UserPasswordUpdateRequest = Depends(),
@@ -62,7 +89,7 @@ async def update_password(
                 detail="Password update failed",
                 )
 
-@router.patch("/me/image", status_code=204)
+@router.patch("/me/image", status_code=204, description="Update current user's image")
 async def update_image(
         request: Request,
         user: User = Depends(get_current_user),
@@ -100,19 +127,20 @@ async def update_image(
         delete_image(image_url)
 
         raise HTTPException(
-            status_code=409,
-            detail="Image update failed",
-        )
+                status_code=409,
+                detail="Image update failed",
+                )
 
-# ADMIN/STAFF ONLY
-@router.get("/{id}", response_model=UserDataResponse, status_code=200, dependencies=[Depends(require_admin)])
+
+
+@router.get("/{id}", response_model=UserDataResponse, status_code=200, description="Get user based on ID")
 async def get_user_by_id(
-        user_id: int,
+        id: int,
         db: AsyncSession = Depends(get_db)
         ):
 
     result = await db.execute(
-            select(User).where(User.id==user_id)
+            select(User).where(User.id==id)
             )
 
     user = result.scalar_one_or_none()
@@ -123,40 +151,32 @@ async def get_user_by_id(
                 detail="User not found"
                 )
 
-    return user
+    return UserDataResponse(
+            name=user.name,
+            role=user.role,
+            gender=user.gender,
+            email=user.email,
+            image=f"data:image/jpeg;base64,{image_to_base64(user.image_url)}",
+        ) 
 
 # ADMIN/STAFF ONLY
-@router.get("/{id}/image", status_code=200, dependencies=[Depends(require_admin)])
-async def get_user_image_by_id(
-        user_id: int,
-        db: AsyncSession = Depends(get_db)
-        ):
-    result = await db.execute(
-            select(User.image_url).where(User.id == user_id)
-            )
-
-    image_url = result.scalar_one_or_none()
-
-    if not image_url:
-        raise HTTPException(
-                status_code=404,
-                detail="Image not found",
-                )
-
-    return FileResponse(image_url)
-
-# ADMIN/STAFF ONLY
-@router.delete("/{id}", status_code=204, dependencies=[Depends(require_admin)])
-async def delete_user_by_id(
-        user_id: int,
+@router.delete("/{id}", status_code=204, dependencies=[Depends(require_admin)], description="Professor only.Soft-delete STUDENTS based on ID, their current registration is deleted.")
+async def deactivate_user_by_id(
+        id: int,
         db: AsyncSession = Depends(get_db)
         ):
 
     result = await db.execute(
-            select(User).where(User.id == user_id)
+            select(User).where(User.id == id)
             )
 
     user = result.scalar_one_or_none()
+
+    if not user.is_active:
+        raise HTTPException(
+                status_code=403,
+                detail="User is inactive",
+                )
 
     if user is None:
         raise HTTPException(
@@ -164,5 +184,18 @@ async def delete_user_by_id(
                 detail="User not found"
                 )
 
-    await db.delete(user)
+    if user.role != UserRole.STUDENT:
+        raise HTTPException(
+                status_code=403,
+                detail="Only student can be deactivated."
+                )
+
+    await db.execute(
+            delete(Registered).where(
+                Registered.user_id == user.id
+                )
+            )
+
+    user.is_active = False
+
     await db.commit()

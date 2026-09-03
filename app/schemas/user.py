@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from fastapi import UploadFile, File
 
 class UserDataResponse(BaseModel):
@@ -6,6 +6,7 @@ class UserDataResponse(BaseModel):
     role: str
     gender: str
     email: str
+    image: str
 
 class UserPasswordUpdateRequest(BaseModel):
     curr_password: str

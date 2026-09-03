@@ -15,7 +15,7 @@ from app.dependencies import process_face_image
 
 router = APIRouter(
     prefix="/auth",
-    tags=["auth"],
+    tags=["Authentication"],
 )
 
 
@@ -31,6 +31,7 @@ async def login(
 
     user = result.scalar_one_or_none()
 
+
     if user is None:
         raise HTTPException(
             status_code=401,
@@ -42,6 +43,12 @@ async def login(
         raise HTTPException(
             status_code=401,
             detail="Invalid email or password",
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=403,
+            detail="User account is deactivated",
         )
 
     # Create JWT
