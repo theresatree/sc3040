@@ -34,9 +34,6 @@ async def lifespan(app: FastAPI):
     print("Starting model loading...", flush=True)
 
     model_dir = str(Path(__file__).resolve().parent.parent / "ml_models")
-
-    ctx_id = -1 if CPU else 0
-
     model_dir = str(Path(__file__).resolve().parent.parent / "ml_models")
     models = load_models(model_dir, cpu=CPU)
 

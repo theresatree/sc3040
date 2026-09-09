@@ -19,6 +19,21 @@ def match_kps(box: np.ndarray, bboxes: np.ndarray, kpss: np.ndarray) -> np.ndarr
     return kpss[int(np.argmax(inter / np.maximum(union, 1e-6)))]
 
 
+def decode_and_detect(data: bytes, detector):
+    """Run in an executor — decode JPEG bytes and run face detection.
+
+    Both steps are blocking (cv2 + ONNX/CV inference), so this must
+    never be called directly on the asyncio event loop.
+    """
+    import cv2
+
+    frame = cv2.imdecode(np.frombuffer(data, dtype=np.uint8), cv2.IMREAD_COLOR)
+    if frame is None:
+        return None, None, None
+    bboxes, kpss = detector.detect(frame, max_num=0, metric="default")
+    return frame, bboxes, kpss
+
+
 class CheckInProcessor:
     """
     Async pipeline for websocket check-in testing.
@@ -28,6 +43,13 @@ class CheckInProcessor:
     app.ml.operations.check_in_test() on a thread pool, maintaining
     per-track similarity/streak/spoof state and confirming a match
     after FOCUS_FRAMES consecutive matches.
+
+    To avoid paying recognition cost for every face on screen, the
+    processor "locks" onto the first track that clears the similarity
+    threshold. Once locked, the websocket handler should only submit
+    samples for that track_id. If the locked track misses the
+    threshold too many times in a row, the lock is released so a
+    different candidate can be tried.
     """
 
     def __init__(
@@ -37,9 +59,10 @@ class CheckInProcessor:
         projection: np.ndarray,
         workers: int | None = None,
         queue_size: int = 8,
-        focus_frames: int = 15,
+        focus_frames: int = 10,
         threshold: float = 0.5,
         max_spoof_attempts: int = 3,
+        lock_release_misses: int = 3,
     ):
         self.state = state
         self.user_iom_embedding = user_iom_embedding
@@ -47,6 +70,7 @@ class CheckInProcessor:
         self.focus_frames = focus_frames
         self.threshold = threshold
         self.max_spoof_attempts = max_spoof_attempts
+        self.lock_release_misses = lock_release_misses
 
         if workers is None:
             det_providers = state.detector.session.get_providers()
@@ -62,6 +86,10 @@ class CheckInProcessor:
         self.track_sims: dict[int, float] = {}
         self.track_streaks: dict[int, int] = {}
         self.track_spoof: dict[int, bool] = {}
+
+        self.locked_track_id: int | None = None
+        self._lock_misses = 0
+
         self.confirm_track_id: int | None = None
         self.confirm_similarity = 0.0
 
@@ -133,6 +161,21 @@ class CheckInProcessor:
                 streak = self.track_streaks.get(track_id, 0)
                 streak = streak + 1 if sim >= self.threshold else 0
                 self.track_streaks[track_id] = streak
+
+                # Lock/release logic: once a track clears threshold, stick
+                # with it so the handler stops submitting everyone else on
+                # screen. Release the lock if the locked track goes cold.
+                if sim >= self.threshold:
+                    if self.locked_track_id == track_id:
+                        self._lock_misses = 0
+                    elif self.locked_track_id is None:
+                        self.locked_track_id = track_id
+                        self._lock_misses = 0
+                elif track_id == self.locked_track_id:
+                    self._lock_misses += 1
+                    if self._lock_misses >= self.lock_release_misses:
+                        self.locked_track_id = None
+                        self._lock_misses = 0
 
                 if streak >= self.focus_frames and self.confirm_track_id is None:
                     self.confirm_track_id = track_id

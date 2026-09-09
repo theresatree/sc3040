@@ -1,220 +1,242 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Check-in WS Tester</title>
-<style>
-  body { font-family: ui-monospace, Menlo, Consolas, monospace; margin: 24px; background: #f6f7f9; }
-  h1 { font-size: 18px; }
-  section { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
-  input, button { font: inherit; padding: 6px 10px; margin: 4px 0; }
-  .ok { color: #1a7f37; }
-  .err { color: #cf222e; }
-  .muted { color: #777; }
-  #log { background: #0f172a; color: #d1e7ff; padding: 12px; border-radius: 8px; max-height: 320px; overflow-y: auto; font-size: 12px; white-space: pre-wrap; }
-  #view { background: #000; border: 1px solid #333; display: block; }
-</style>
-</head>
-<body>
-<h1>Check-in WebSocket Tester</h1>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Check-in WS Tester</title>
+        <style>
+body { font-family: ui-monospace, Menlo, Consolas, monospace; margin: 24px; background: #f6f7f9; }
+h1 { font-size: 18px; }
+section { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+input, button { font: inherit; padding: 6px 10px; margin: 4px 0; }
+.ok { color: #1a7f37; }
+.err { color: #cf222e; }
+.muted { color: #777; }
+#log { background: #0f172a; color: #d1e7ff; padding: 12px; border-radius: 8px; max-height: 320px; overflow-y: auto; font-size: 12px; white-space: pre-wrap; }
+#view { background: #000; border: 1px solid #333; display: block; }
+        </style>
+    </head>
+    <body>
+        <h1>Check-in WebSocket Tester</h1>
 
-<section>
-  <h2>1. Login</h2>
-  <input id="email" type="email" placeholder="email">
-  <input id="password" type="password" placeholder="password">
-  <button id="loginBtn">Login</button>
-  <span id="loginStatus"></span>
-</section>
+        <section>
+            <h2>1. Login</h2>
+            <input id="email" type="email" placeholder="email">
+            <input id="password" value="password" type="password" placeholder="password">
+            <button id="loginBtn">Login</button>
+            <span id="loginStatus"></span>
+        </section>
 
-<section>
-  <h2>2. Connect + send frames</h2>
-  <button id="connectBtn" disabled>Connect & Start Camera</button>
-  <button id="stopBtn" disabled>Stop</button>
-  <span id="wsStatus"></span>
-</section>
+        <section>
+            <h2>2. Connect + send frames</h2>
+            <button id="connectBtn" disabled>Connect & Start Camera</button>
+            <button id="stopBtn" disabled>Stop</button>
+            <span id="wsStatus"></span>
+        </section>
 
-<section>
-  <video id="cam" width="640" height="480" autoplay muted playsinline hidden></video>
-  <canvas id="capture" width="640" height="480" hidden></canvas>
-  <canvas id="view" width="640" height="480"></canvas>
-  <div id="stats" class="muted"></div>
-</section>
+        <section>
+            <video id="cam" width="640" height="480" autoplay muted playsinline hidden></video>
+            <canvas id="capture" width="640" height="480" hidden></canvas>
+            <canvas id="view" width="640" height="480"></canvas>
+            <div id="stats" class="muted"></div>
+        </section>
 
-<section>
-  <h2>messages</h2>
-  <div id="log"></div>
-</section>
+        <section>
+            <h2>messages</h2>
+            <div id="log"></div>
+        </section>
 
-<script>
-const apiBase = "ws://" + location.host;
-const httpBase = location.origin;
-const MAX_BUFFER = 200 * 1024;
-const FOCUS_FRAMES = 15;
+        <script>
+            const apiBase =
+                location.protocol === "https:"
+                ? "wss://" + location.host
+                : "ws://" + location.host;
 
-let token = null;
-let ws = null;
-let timer = null;
-let stream = null;
-let lastResult = null;
-let sentFrames = 0;
-let recvMsgs = 0;
+            const httpBase = location.origin;
+            const MAX_BUFFER = 200 * 1024;
+            const FOCUS_FRAMES = 10;
 
-const logEl = document.getElementById("log");
-const loginStatus = document.getElementById("loginStatus");
-const wsStatus = document.getElementById("wsStatus");
-const view = document.getElementById("view");
-const viewCtx = view.getContext("2d");
+            let token = null;
+            let ws = null;
+            let timer = null;
+            let stream = null;
+            let lastResult = null;
+            let sentFrames = 0;
+            let recvMsgs = 0;
 
-function log(msg) {
-  const line = document.createElement("div");
-  line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-  logEl.prepend(line);
-  while (logEl.childElementCount > 200) logEl.lastChild.remove();
-}
+            const logEl = document.getElementById("log");
+            const loginStatus = document.getElementById("loginStatus");
+            const wsStatus = document.getElementById("wsStatus");
+            const view = document.getElementById("view");
+            const viewCtx = view.getContext("2d");
 
-function setStatus(el, text, ok) {
-  el.textContent = text;
-  el.className = ok === undefined ? "" : ok ? "ok" : "err";
-}
+            function log(msg) {
+                const line = document.createElement("div");
+                line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+                logEl.prepend(line);
+                while (logEl.childElementCount > 200) logEl.lastChild.remove();
+            }
 
-document.getElementById("loginBtn").onclick = async () => {
-  setStatus(loginStatus, "logging in...");
-  try {
-    const resp = await fetch(`${httpBase}/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: document.getElementById("email").value.trim(),
-        password: document.getElementById("password").value,
-      }),
-    });
-    const data = await resp.json();
-    if (!resp.ok) {
-      setStatus(loginStatus, `login failed: ${data.detail ?? resp.status}`, false);
-      return;
-    }
-    token = data.access_token;
-    setStatus(loginStatus, "logged in", true);
-    document.getElementById("connectBtn").disabled = false;
-    log(`token: ${token.slice(0, 24)}...`);
-  } catch (err) {
-    setStatus(loginStatus, `error: ${err.message}`, false);
-  }
-};
+            function setStatus(el, text, ok) {
+                el.textContent = text;
+                el.className = ok === undefined ? "" : ok ? "ok" : "err";
+            }
 
-const connectBtn = document.getElementById("connectBtn");
-const stopBtn = document.getElementById("stopBtn");
+            document.getElementById("loginBtn").onclick = async () => {
+                setStatus(loginStatus, "logging in...");
+                try {
+                    const resp = await fetch(`${httpBase}/auth/login`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            email: document.getElementById("email").value.trim(),
+                            password: document.getElementById("password").value,
+                        }),
+                    });
+                    const data = await resp.json();
+                    if (!resp.ok) {
+                        setStatus(loginStatus, `login failed: ${data.detail ?? resp.status}`, false);
+                        return;
+                    }
+                    token = data.access_token;
+                    setStatus(loginStatus, "logged in", true);
+                    document.getElementById("connectBtn").disabled = false;
+                    log(`token: ${token.slice(0, 24)}...`);
+                } catch (err) {
+                    setStatus(loginStatus, `error: ${err.message}`, false);
+                }
+            };
 
-connectBtn.onclick = async () => {
-  if (!token) return;
+            const connectBtn = document.getElementById("connectBtn");
+            const stopBtn = document.getElementById("stopBtn");
 
-  stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
-  const video = document.getElementById("cam");
-  video.srcObject = stream;
+            connectBtn.onclick = async () => {
+                if (!token) return;
 
-  ws = new WebSocket(`${apiBase}/attendance/ws/check-in?token=${token}`);
-  ws.binaryType = "arraybuffer";
+                stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
 
-  ws.onopen = () => {
-    setStatus(wsStatus, "connected", true);
-    connectBtn.disabled = true;
-    stopBtn.disabled = false;
-    timer = setInterval(sendFrame, 400);
-    log("streaming at ~2.5 fps");
-  };
+                const video = document.getElementById("cam");
+                video.srcObject = stream;
+                const wsUrl =
+                    `${apiBase}/attendance/ws/check-in?token=${token}`;
 
-  ws.onmessage = (e) => {
-    const msg = JSON.parse(e.data);
-    lastResult = msg;
-    recvMsgs++;
-    render();
-    if (msg.focus && msg.focus.streak >= FOCUS_FRAMES) {
-      log(`>>> confirmed track #${msg.focus.track_id}`);
-    }
-  };
+                log(`Connecting to: ${wsUrl}`);
+                ws = new WebSocket(wsUrl);
+                ws.binaryType = "arraybuffer";
 
-  ws.onclose = (e) => {
-    setStatus(wsStatus, `closed (${e.code}) ${e.reason || ""}`, false);
-    if (e.code === 1000 && e.reason) log(`server reason: ${e.reason}`);
-    connectBtn.disabled = false;
-    stopBtn.disabled = true;
-    clearInterval(timer);
-    timer = null;
-    stopStream();
-  };
+                ws.onopen = () => {
+                    ws.send(JSON.stringify({
+                        latitude: 1.3521,
+                        longitude: 103.8198
+                    }));
 
-  ws.onerror = () => log("websocket error");
-};
+                    setStatus(wsStatus, "connected", true);
+                    connectBtn.disabled = true;
+                    stopBtn.disabled = false;
+                    timer = setInterval(sendFrame, 100);
+                };
 
-stopBtn.onclick = () => {
-  clearInterval(timer);
-  timer = null;
-  stopStream();
-  if (ws) ws.close();
-};
+                ws.onmessage = (e) => {
+                    const msg = JSON.parse(e.data);
+                    lastResult = msg;
+                    recvMsgs++;
+                    render();
+                    if (msg.focus && msg.focus.streak >= FOCUS_FRAMES) {
+                        log(`>>> confirmed track #${msg.focus.track_id}`);
+                    }
+                };
 
-function stopStream() {
-  if (stream) {
-    stream.getTracks().forEach((t) => t.stop());
-    stream = null;
-  }
-}
 
-function sendFrame() {
-  if (!ws || ws.readyState !== WebSocket.OPEN) return;
-  if (ws.bufferedAmount > MAX_BUFFER) return;
-  const video = document.getElementById("cam");
-  const capture = document.getElementById("capture");
-  capture.getContext("2d").drawImage(video, 0, 0, capture.width, capture.height);
-  capture.toBlob((blob) => {
-    if (blob && ws.readyState === WebSocket.OPEN) {
-      sentFrames++;
-      ws.send(blob);
-    }
-  }, "image/jpeg", 0.85);
-  render();
-}
+                ws.onerror = (e) => {
+                    log("websocket error");
+                    console.log("WebSocket error:", e);
+                };
 
-function render() {
-  const video = document.getElementById("cam");
-  viewCtx.drawImage(video, 0, 0, view.width, view.height);
-  if (lastResult && Array.isArray(lastResult.tracks)) {
-    const focusId = lastResult.focus?.track_id;
-    for (const t of lastResult.tracks) {
-      const box = smoothBox(t.bbox, t.track_id);
-      const [x1, y1, x2, y2] = box;
-      const isFocus = t.track_id === focusId || t.spoof;
-      viewCtx.strokeStyle = t.spoof ? "#ff4444" : (isFocus ? "#00ff88" : "#ffffff");
-      viewCtx.lineWidth = isFocus ? 3 : 2;
-      viewCtx.strokeRect(x1, y1, x2 - x1, y2 - y1);
-      viewCtx.fillStyle = t.spoof ? "#ff4444" : (isFocus ? "#00ff88" : "#ffffff");
-      viewCtx.font = "14px ui-monospace, monospace";
-      const sim = t.similarity == null ? "" : `  ${(t.similarity * 100).toFixed(0)}%`;
-      viewCtx.fillText(`#${t.track_id}${sim}${t.spoof ? "  SPOOF!" : ""}`, x1, Math.max(16, y1 - 6));
-    }
-  }
-  const sims = (lastResult?.tracks ?? []).map(t => t.similarity).filter(s => s != null);
-  const best = sims.length ? `${(Math.max(...sims) * 100).toFixed(0)}%` : "-";
-  const hasFocus = lastResult?.focus?.track_id != null;
-  document.getElementById("stats").textContent =
-    `sent: ${sentFrames}  received: ${recvMsgs}  |  best sim: ${best}` +
-    (hasFocus
-      ? `  |  focus #${lastResult.focus.track_id} ${lastResult.focus.streak}/${FOCUS_FRAMES}`
-      : "  |  no focus yet");
-}
+                ws.onclose = (e) => {
+                    log(`WebSocket closed: code=${e.code}, reason="${e.reason}"`);
 
-const smoothBoxes = {};
-function smoothBox(box, id) {
-  const s = smoothBoxes[id];
-  if (!s) {
-    smoothBoxes[id] = [...box];
-    return smoothBoxes[id];
-  }
-  const k = 0.35;
-  for (let i = 0; i < 4; i++) s[i] += (box[i] - s[i]) * k;
-  return s;
-}
-</script>
-</body>
+                    setStatus(
+                        wsStatus,
+                        `closed (${e.code}) ${e.reason || ""}`,
+                        false
+                    );
+
+                    connectBtn.disabled = false;
+                    stopBtn.disabled = true;
+                    clearInterval(timer);
+                    timer = null;
+                    stopStream();
+                };
+            };
+
+            stopBtn.onclick = () => {
+                clearInterval(timer);
+                timer = null;
+                stopStream();
+                if (ws) ws.close();
+            };
+
+            function stopStream() {
+                if (stream) {
+                    stream.getTracks().forEach((t) => t.stop());
+                    stream = null;
+                }
+            }
+
+            function sendFrame() {
+                if (!ws || ws.readyState !== WebSocket.OPEN) return;
+                if (ws.bufferedAmount > MAX_BUFFER) return;
+                const video = document.getElementById("cam");
+                const capture = document.getElementById("capture");
+                capture.getContext("2d").drawImage(video, 0, 0, capture.width, capture.height);
+                capture.toBlob((blob) => {
+                    if (blob && ws.readyState === WebSocket.OPEN) {
+                        sentFrames++;
+                        ws.send(blob);
+                    }
+                }, "image/jpeg", 0.85);
+                render();
+            }
+
+            function render() {
+                const video = document.getElementById("cam");
+                viewCtx.drawImage(video, 0, 0, view.width, view.height);
+                if (lastResult && Array.isArray(lastResult.tracks)) {
+                    const focusId = lastResult.focus?.track_id;
+                    for (const t of lastResult.tracks) {
+                        const box = smoothBox(t.bbox, t.track_id);
+                        const [x1, y1, x2, y2] = box;
+                        const isFocus = t.track_id === focusId || t.spoof;
+                        viewCtx.strokeStyle = t.spoof ? "#ff4444" : (isFocus ? "#00ff88" : "#ffffff");
+                        viewCtx.lineWidth = isFocus ? 3 : 2;
+                        viewCtx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+                        viewCtx.fillStyle = t.spoof ? "#ff4444" : (isFocus ? "#00ff88" : "#ffffff");
+                        viewCtx.font = "14px ui-monospace, monospace";
+                        const sim = t.similarity == null ? "" : `  ${(t.similarity * 100).toFixed(0)}%`;
+                        viewCtx.fillText(`#${t.track_id}${sim}${t.spoof ? "  SPOOF!" : ""}`, x1, Math.max(16, y1 - 6));
+                    }
+                }
+                const sims = (lastResult?.tracks ?? []).map(t => t.similarity).filter(s => s != null);
+                const best = sims.length ? `${(Math.max(...sims) * 100).toFixed(0)}%` : "-";
+                const hasFocus = lastResult?.focus?.track_id != null;
+                document.getElementById("stats").textContent =
+                    `sent: ${sentFrames}  received: ${recvMsgs}  |  best sim: ${best}` +
+                    (hasFocus
+                        ? `  |  focus #${lastResult.focus.track_id} ${lastResult.focus.streak}/${FOCUS_FRAMES}`
+                        : "  |  no focus yet");
+            }
+
+            const smoothBoxes = {};
+            function smoothBox(box, id) {
+                const s = smoothBoxes[id];
+                if (!s) {
+                    smoothBoxes[id] = [...box];
+                    return smoothBoxes[id];
+                }
+                const k = 0.35;
+                for (let i = 0; i < 4; i++) s[i] += (box[i] - s[i]) * k;
+                return s;
+            }
+        </script>
+    </body>
 </html>
