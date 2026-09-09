@@ -90,10 +90,10 @@ async def client(db_session, app_state):
 from tests.constants import IMAGE_PATH
 
 @pytest_asyncio.fixture()
-async def registered_user(client):
+async def logged_in_student(client):
     payload = {
-        "name": "Test",
-        "email": "student@example.com",
+        "name": "Edmund",
+        "email": "edmund@test.com",
         "password": "password",
         "gender": "male",
         "role": "student",

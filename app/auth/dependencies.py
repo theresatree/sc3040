@@ -2,7 +2,7 @@ from app.db.enums import UserRole
 import jwt
 from app.auth.jwt import decode_access_token
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, WebSocket
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from sqlalchemy import select
@@ -49,6 +49,41 @@ async def get_current_user(
 
     return user
 
+async def get_current_user_ws(
+        websocket: WebSocket,
+        db: AsyncSession = Depends(get_db),
+        ) -> User:
+    token = websocket.query_params.get("token")
+
+    if token is None:
+        raise HTTPException(
+                status_code=401,
+                detail="Missing token",
+                )
+
+    try:
+        payload = decode_access_token(token)
+        user_id = int(payload["sub"])
+    except (jwt.InvalidTokenError, KeyError, ValueError):
+        raise HTTPException(
+                status_code=401,
+                detail="Invalid token",
+                )
+
+    result = await db.execute(
+            select(User).where(User.id == user_id)
+            )
+
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        raise HTTPException(
+                status_code=401,
+                detail="User not found",
+                )
+
+    return user
+
 async def require_admin(
       user: User = Depends(get_current_user),
         ) -> User:
@@ -59,3 +94,4 @@ async def require_admin(
                 detail="Student access denied",
                 )
     return user
+

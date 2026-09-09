@@ -26,4 +26,4 @@ For the anti-spooofing
 
 
 To seed data:
-docker compose exec api env PYTHONPATH=/app uv run python scripts/seed_data.py
+docker compose exec api uv run python -m scripts.seed_db.main

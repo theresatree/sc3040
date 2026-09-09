@@ -1,7 +1,8 @@
 from datetime import date, datetime, time
+from geoalchemy2 import Geography
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import ForeignKey, String, LargeBinary
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy import Enum as SQLEnum
 from .enums import UserRole, UserGender, DayOfWeek
@@ -23,16 +24,19 @@ class User(Base):
     )
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
-    face_embedding: Mapped[list[float]] = mapped_column(Vector(512))
-    image_url: Mapped[str] = mapped_column(String(500))
+    iom_embedding: Mapped[list[float]] = mapped_column(Vector(128))
 
 class Room(Base):
     __tablename__ = "rooms"
 
     id: Mapped[str] = mapped_column(String(50),primary_key=True)
     name: Mapped[str] = mapped_column(String(255))
-    latitude: Mapped[float]
-    longitude: Mapped[float]
+    location: Mapped[object] = mapped_column(
+        Geography(
+            geometry_type="POINT",
+            srid=4326,
+        )
+    )
     capacity: Mapped[int]
 
 
@@ -68,7 +72,7 @@ class Registered(Base):
         ForeignKey("timetables.id", name="registered_timetable_id_fkey"),
         primary_key=True,
     )
-
+    timetable: Mapped["Timetable"] = relationship()
 
 class Attendance(Base):
     __tablename__ = "attendance"

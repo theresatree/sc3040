@@ -2,6 +2,8 @@ import cv2
 import numpy as np
 from insightface.app.common import Face
 
+from app.auth.embeddings import iom_similarity, iom_hash
+
 # _crop_face() and _preprocess() is needed for the spoofing.
 
 def _crop_face(img: np.ndarray, bbox: tuple, expansion: float) -> np.ndarray:
@@ -162,5 +164,54 @@ def check_spoofing(
     spoof_logit = float(logits[1])
 
     return real_logit - spoof_logit >= threshold
+
+
+def check_in_test(
+    image_bytes: bytes,
+    state,
+    bbox: np.ndarray,
+    kps: np.ndarray,
+    user_iom_embedding: np.ndarray,
+    projection: np.ndarray,
+    spoof_threshold: float = 0.0,
+) -> tuple[float, bool]:
+    """
+    Embed + IoM compare + spoof check for a single tracked face.
+
+    Returns (similarity, spoofed). Similarity is -1.0 if the face is a spoof
+    or the image cannot be decoded, so it never counts as a match.
+    """
+    img = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), cv2.IMREAD_COLOR)
+
+    if img is None:
+        return -1.0, False
+
+    face = Face(
+        bbox=np.asarray(bbox, dtype=np.float32),
+        kps=np.asarray(kps, dtype=np.float32),
+    )
+
+    state.landmark.get(img, face)
+    embedding = state.recognizer.get(img, face)
+
+    probe_iom = iom_hash(
+        np.asarray(embedding, dtype=np.float32),
+        projection,
+    )
+    similarity = iom_similarity(user_iom_embedding, probe_iom)
+
+    x1, y1, x2, y2 = map(int, bbox[:4])
+    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    face_crop = _crop_face(img_rgb, (x1, y1, x2, y2), expansion=1.5)
+    input_tensor = _preprocess(face_crop, model_img_size=128)[None, ...]
+
+    input_name = state.spoofing.get_inputs()[0].name
+    logits = state.spoofing.run(None, {input_name: input_tensor})[0][0]
+    spoofed = float(logits[0]) - float(logits[1]) < spoof_threshold
+
+    if spoofed:
+        similarity = -1.0
+
+    return similarity, spoofed
 
 

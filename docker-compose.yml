@@ -1,6 +1,8 @@
 services:
   db:
-    image: pgvector/pgvector:pg18
+    build:
+      context: .
+      dockerfile: Dockerfile.db
     environment:
       POSTGRES_USER: sc3040
       POSTGRES_PASSWORD: sc3040

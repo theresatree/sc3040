@@ -7,7 +7,9 @@ requires-python = ">=3.13"
 dependencies = [
     "alembic>=1.19.1",
     "asgi-lifespan>=2.1.0",
+    "cryptography>=50.0.1",
     "fastapi[standard]>=0.141.1",
+    "geoalchemy2>=0.20.0",
     "greenlet>=3.5.5",
     "insightface>=1.0.1",
     "pgvector>=0.5.0",
@@ -17,9 +19,11 @@ dependencies = [
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "sqlalchemy>=2.0.52",
+    "supervision>=0.30.2",
     "testcontainers-postgres>=0.0.1rc1",
     "testcontainers[postgresql]>=4.15.0",
     "tqdm>=4.70.0",
+    "trackers>=2.6.0",
 ]
 
 [tool.fastapi]
