@@ -1,9 +1,23 @@
 # sc3040
 
-***** RUN
 
-python scripts/download_models.py
+# Tech stack
+1. PostGres
+    - PostGIS (Store geolocation)
+    - pgvector (store vectors)
 
+
+# To Build and run
+```bash
+docker compose up --build -d
+```
+
+To seed data:
+```bash
+docker compose exec api uv run python -m scripts.seed_db.main
+```
+
+# Models used
 *Note:
 https://github.com/deepinsight/insightface/tree/master/model_zoo
 InsightFace uses both 128x128 and 640x640
@@ -25,5 +39,3 @@ For the anti-spooofing
 - spoofing_model.onnx	
 
 
-To seed data:
-docker compose exec api uv run python -m scripts.seed_db.main

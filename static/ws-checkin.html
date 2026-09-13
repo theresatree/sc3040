@@ -133,7 +133,7 @@ input, button { font: inherit; padding: 6px 10px; margin: 4px 0; }
                     setStatus(wsStatus, "connected", true);
                     connectBtn.disabled = true;
                     stopBtn.disabled = false;
-                    timer = setInterval(sendFrame, 100);
+                    timer = setInterval(sendFrame, 200);
                 };
 
                 ws.onmessage = (e) => {
