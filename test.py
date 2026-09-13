@@ -19,8 +19,8 @@ import cv2
 import numpy as np
 import supervision as sv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from trackers import ByteTrackTracker
 from insightface.model_zoo import model_zoo
+from trackers import ByteTrackTracker
 
 MODEL_PATH = "ml_models/det_10g.onnx"
 
@@ -57,10 +57,12 @@ async def track_ws(websocket: WebSocket):
 
             frame = cv2.imdecode(np.frombuffer(data, dtype=np.uint8), cv2.IMREAD_COLOR)
             if frame is None:
-                await websocket.send_text(json.dumps({"error": "could not decode frame"}))
+                await websocket.send_text(
+                    json.dumps({"error": "could not decode frame"})
+                )
                 continue
 
-            bboxes, kpss = detector.detect(frame, max_num=0, metric="default")
+            bboxes, _ = detector.detect(frame, max_num=0, metric="default")
 
             tracks = []
             current_ids = set()
@@ -82,13 +84,15 @@ async def track_ws(websocket: WebSocket):
                     confirmed = streak_counts[track_id] >= CONFIRM_FRAMES
 
                     x1, y1, x2, y2 = box.tolist()
-                    tracks.append({
-                        "track_id": track_id,
-                        "bbox": [x1, y1, x2, y2],
-                        "confidence": float(score),
-                        "streak": streak_counts[track_id],
-                        "confirmed": confirmed,
-                    })
+                    tracks.append(
+                        {
+                            "track_id": track_id,
+                            "bbox": [x1, y1, x2, y2],
+                            "confidence": float(score),
+                            "streak": streak_counts[track_id],
+                            "confirmed": confirmed,
+                        }
+                    )
 
             # Reset the streak for any track_id that didn't appear this frame,
             # so "confirmed" only reflects truly continuous presence.
@@ -100,7 +104,10 @@ async def track_ws(websocket: WebSocket):
 
             confirmed_track = next((t for t in tracks if t["confirmed"]), None)
             if confirmed_track is not None:
-                await websocket.close(code=1000, reason=f"confirmed track_id={confirmed_track['track_id']}")
+                await websocket.close(
+                    code=1000,
+                    reason=f"confirmed track_id={confirmed_track['track_id']}",
+                )
                 return
 
     except WebSocketDisconnect:

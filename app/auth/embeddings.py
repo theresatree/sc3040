@@ -1,13 +1,13 @@
 import hashlib
-import numpy as np
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-from cryptography.hazmat.primitives import hashes
 
+import numpy as np
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 SECRET_KEY = "8a21821f32711a2fbbeac60f5c52a31a8bbfb5132fb08a8bd59964ff5e347033"
 
 EMBEDDING_DIM = 512
-NUM_GROUPS = 128 # no of computations
+NUM_GROUPS = 128  # no of computations
 GROUP_SIZE = 4
 
 
@@ -26,18 +26,16 @@ def generate_iom_projection(key: bytes) -> np.ndarray:
 
     rng = np.random.default_rng(seed)
 
-    return rng.standard_normal(
-        (NUM_GROUPS, GROUP_SIZE, EMBEDDING_DIM)
-    ).astype(np.float32)
+    return rng.standard_normal((NUM_GROUPS, GROUP_SIZE, EMBEDDING_DIM)).astype(
+        np.float32
+    )
 
 
-def iom_hash( embedding: np.ndarray, projection: np.ndarray) -> np.ndarray:
+def iom_hash(embedding: np.ndarray, projection: np.ndarray) -> np.ndarray:
     embedding = np.asarray(embedding, dtype=np.float32)
 
     if embedding.shape != (EMBEDDING_DIM,):
-        raise ValueError(
-            f"Expected ({EMBEDDING_DIM},), got {embedding.shape}"
-        )
+        raise ValueError(f"Expected ({EMBEDDING_DIM},), got {embedding.shape}")
 
     scores = np.einsum(
         "gkd,d->gk",
@@ -48,8 +46,6 @@ def iom_hash( embedding: np.ndarray, projection: np.ndarray) -> np.ndarray:
     return np.argmax(scores, axis=1).astype(np.uint8)
 
 
-def iom_similarity( template1: np.ndarray, template2: np.ndarray) -> float:
+def iom_similarity(template1: np.ndarray, template2: np.ndarray) -> float:
 
-    return float(
-        np.mean(template1 == template2)
-    )
+    return float(np.mean(template1 == template2))

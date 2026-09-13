@@ -1,26 +1,26 @@
-from app.schemas.auth import LoginRequest
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.auth.jwt import create_access_token
 from app.auth.password import verify_password
 from app.db.database import get_db
 from app.db.models import User
+from app.schemas.auth import LoginRequest
 
 router = APIRouter(
     prefix="/auth",
     tags=["auth"],
 )
 
+
 @router.post("/login")
 async def login(
-        data: LoginRequest,
-        db: AsyncSession = Depends(get_db),
+    data: LoginRequest,
+    db: AsyncSession = Depends(get_db),
 ):
     # Find user
-    result = await db.execute(
-        select(User).where(User.email == data.email)
-    )
+    result = await db.execute(select(User).where(User.email == data.email))
 
     user = result.scalar_one_or_none()
 

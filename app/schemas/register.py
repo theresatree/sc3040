@@ -1,6 +1,9 @@
-from app.db.enums import DayOfWeek
-from pydantic import BaseModel, ConfigDict
 from datetime import time
+
+from pydantic import BaseModel, ConfigDict
+
+from app.db.enums import DayOfWeek
+
 
 class TimetableData(BaseModel):
     subject: str

@@ -7,14 +7,64 @@
     - pgvector (store vectors)
 
 
+# NOTE: BEFORE PUSHING
+Please run the linting and all the other checks in Makefile.
+- This ensures consistency and make sure everything works.
+
+E.g. for linting
+```bash
+make lint
+```
+
 # To Build and run
+
+*Note: the download script might not run, given we need to have tqdm.
+- In that case, run to create venv and download dependencies
+
+```
+uv sync
+```
+
+1. DOWNLOAD MODELS FIRST.
+```python
+python scripts/download_models.py
+```
+
+2. Run the backend.
 ```bash
 docker compose up --build -d
 ```
 
-To seed data:
+*Note: I exposed the postgres to outside docker as 5433 instead of 5432 to prevent conflict with local postgres
+
+3. To seed data:
 ```bash
 docker compose exec api uv run python -m scripts.seed_db.main
+```
+
+\
+\
+To access FASTAPI docs
+- http://www.localhost:8000/docs
+
+To login:
+For instance, for yao sheng
+- username: yao.sheng@test.com
+- password: password
+
+To access the camera prototype
+- http://www.localhost/ws-checkin.html
+
+# To update alembic
+
+To create new revision
+```
+docker compose exec api uv run alembic revision --autogenerate -m "describe your change"
+```
+
+To upgrade to latest head
+```
+docker compose exec api uv run alembic upgrade head
 ```
 
 # Models used

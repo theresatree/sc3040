@@ -2,9 +2,10 @@ import cv2
 import numpy as np
 from insightface.app.common import Face
 
-from app.auth.embeddings import iom_similarity, iom_hash
+from app.auth.embeddings import iom_hash, iom_similarity
 
 # _crop_face() and _preprocess() is needed for the spoofing.
+
 
 def _crop_face(img: np.ndarray, bbox: tuple, expansion: float) -> np.ndarray:
     """Extract square face crop from bbox with expansion. Pad edges with reflection."""
@@ -122,11 +123,12 @@ def get_face_embedding(
 
     return embedding.tolist()
 
+
 def check_spoofing(
     image_bytes: bytes,
     detector,
     spoofing,
-    threshold: float = 0.0, # apparently it uses logits, so 0.0 logits = 0.5
+    threshold: float = 0.0,  # apparently it uses logits, so 0.0 logits = 0.5
 ) -> bool:
     """
     Checks whether image is genuine or a spoof (photo/screen).
@@ -213,5 +215,3 @@ def check_in_test(
         similarity = -1.0
 
     return similarity, spoofed
-
-

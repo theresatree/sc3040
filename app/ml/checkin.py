@@ -1,8 +1,8 @@
 import asyncio
 import os
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
-from concurrent.futures import ThreadPoolExecutor
 
 from app.ml.operations import check_in_test
 
@@ -176,9 +176,7 @@ class CheckInProcessor:
 
                 streak = self.track_streaks.get(track_id, 0)
                 self.track_streaks[track_id] = (
-                    streak + 1
-                    if sim >= self.threshold
-                    else 0
+                    streak + 1 if sim >= self.threshold else 0
                 )
 
                 if sim >= self.threshold:

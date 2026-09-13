@@ -1,9 +1,8 @@
+import zipfile
 from pathlib import Path
 from urllib.request import urlopen
-import zipfile
 
 from tqdm import tqdm
-
 
 MODEL_DIR = Path(__file__).resolve().parent.parent / "ml_models"
 MODEL_DIR.mkdir(parents=True, exist_ok=True)
@@ -12,8 +11,7 @@ MODEL_DIR.mkdir(parents=True, exist_ok=True)
 # ── InsightFace buffalo_l ─────────────────────────────
 
 INSIGHTFACE_URL = (
-    "https://github.com/deepinsight/insightface"
-    "/releases/download/v0.7/buffalo_l.zip"
+    "https://github.com/deepinsight/insightface/releases/download/v0.7/buffalo_l.zip"
 )
 
 INSIGHTFACE_ZIP = MODEL_DIR / "buffalo_l.zip"
@@ -28,16 +26,18 @@ else:
     with urlopen(INSIGHTFACE_URL) as response:
         total = int(response.headers.get("Content-Length", 0))
 
-        with open(INSIGHTFACE_ZIP, "wb") as f:
-            with tqdm(
+        with (
+            open(INSIGHTFACE_ZIP, "wb") as f,
+            tqdm(
                 total=total,
                 unit="B",
                 unit_scale=True,
                 desc="buffalo_l",
-            ) as progress:
-                while chunk := response.read(8192):
-                    f.write(chunk)
-                    progress.update(len(chunk))
+            ) as progress,
+        ):
+            while chunk := response.read(8192):
+                f.write(chunk)
+                progress.update(len(chunk))
 
     print("Extracting InsightFace buffalo_l...", flush=True)
 
@@ -67,16 +67,18 @@ else:
     with urlopen(SPOOF_URL) as response:
         total = int(response.headers.get("Content-Length", 0))
 
-        with open(SPOOF_PATH, "wb") as f:
-            with tqdm(
+        with (
+            open(SPOOF_PATH, "wb") as f,
+            tqdm(
                 total=total,
                 unit="B",
                 unit_scale=True,
                 desc="anti-spoof",
-            ) as progress:
-                while chunk := response.read(8192):
-                    f.write(chunk)
-                    progress.update(len(chunk))
+            ) as progress,
+        ):
+            while chunk := response.read(8192):
+                f.write(chunk)
+                progress.update(len(chunk))
 
     print("Anti-spoofing model downloaded.", flush=True)
 

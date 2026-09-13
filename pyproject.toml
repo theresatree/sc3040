@@ -18,6 +18,7 @@ dependencies = [
     "pyjwt>=2.13.0",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
+    "ruff>=0.16.7",
     "sqlalchemy>=2.0.52",
     "supervision>=0.30.2",
     "testcontainers-postgres>=0.0.1rc1",
@@ -36,3 +37,6 @@ filterwarnings = [
     "ignore::FutureWarning:insightface.*",
     "ignore:transaction already deassociated from connection:sqlalchemy.exc.SAWarning",
 ]
+
+[tool.ruff.lint]
+ignore = ["B008", "ASYNC230"]

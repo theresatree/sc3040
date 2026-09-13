@@ -1,35 +1,30 @@
-from fastapi import HTTPException
+import asyncio
+from datetime import UTC, datetime, timedelta
+
 import cv2
 import numpy as np
 import supervision as sv
-
-from datetime import datetime, timedelta
-
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from geoalchemy2 import Geography
 from sqlalchemy import cast, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
-
 from trackers import ByteTrackTracker
+
 from app.auth.dependencies import get_current_user_ws, require_admin
 from app.auth.embeddings import derive_user_key, generate_iom_projection
+from app.constants import FRAME_SKIP, GRACE_DISTANCE, GRACE_PERIOD
 from app.db.database import get_db
 from app.db.enums import DayOfWeek
-from app.db.models import Attendance, Registered, Timetable
+from app.db.models import Attendance, Registered, Timetable, User
 from app.ml.checkin import CheckInProcessor, match_detection
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
-from app.db.models import User
-import asyncio
 
 router = APIRouter(
     prefix="/attendance",
     tags=["attendance"],
 )
 
-GRACE_PERIOD = 15
-GRACE_DISTANCE = 25  # meters
-FRAME_SKIP = 5
 
 def decode_and_detect(data: bytes, detector):
     frame = cv2.imdecode(np.frombuffer(data, dtype=np.uint8), cv2.IMREAD_COLOR)
@@ -39,8 +34,10 @@ def decode_and_detect(data: bytes, detector):
     return frame, bboxes, kpss
 
 
-async def record_attendance( db: AsyncSession, user_id: int, latitude: float, longitude: float) -> int | None:
-    now = datetime.utcnow()
+async def record_attendance(
+    db: AsyncSession, user_id: int, latitude: float, longitude: float
+) -> int | None:
+    now = datetime.now(UTC)
     today = now.date()
     current_time = now.time()
 
@@ -61,8 +58,7 @@ async def record_attendance( db: AsyncSession, user_id: int, latitude: float, lo
         (
             t
             for t in timetables
-            if t.day_of_week == current_day
-            and t.start <= current_time <= t.end
+            if t.day_of_week == current_day and t.start <= current_time <= t.end
         ),
         None,
     )
@@ -74,8 +70,7 @@ async def record_attendance( db: AsyncSession, user_id: int, latitude: float, lo
         )
 
     grace_end = (
-        datetime.combine(today, chosen.start)
-        + timedelta(minutes=GRACE_PERIOD)
+        datetime.combine(today, chosen.start) + timedelta(minutes=GRACE_PERIOD)
     ).time()
 
     if current_time > grace_end:
@@ -114,18 +109,19 @@ async def record_attendance( db: AsyncSession, user_id: int, latitude: float, lo
 
     return chosen.id
 
-@router.post("/{timetable_id}", status_code=201, description="Professor use only.")
+
+@router.post("/{timetable_id}", status_code=201, description="Staff use only.")
 async def mark_attendance_manually(
-        timetable_id: int,
-        user_id: int,
-        professor: User = Depends(require_admin),
-        db: AsyncSession = Depends(get_db)
-        ):
+    timetable_id: int,
+    user_id: int,
+    staff: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
 
     result = await db.execute(
         select(Timetable).where(
             Timetable.id == timetable_id,
-            Timetable.professor_id == professor.id,
+            Timetable.staff == staff.id,
         )
     )
 
@@ -152,7 +148,7 @@ async def mark_attendance_manually(
             detail="User is not registered for this timetable",
         )
 
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     today = now.date()
 
     db.add(
@@ -208,11 +204,13 @@ async def attendance_websocket(
 
             # Skip frames to reduce processing load.
             if frame_count % FRAME_SKIP != 0:
-                await websocket.send_json({
-                    "tracks": last_tracks,
-                    "focus": last_focus,
-                    "attempts_remaining": processor.attempts_remaining,
-                })
+                await websocket.send_json(
+                    {
+                        "tracks": last_tracks,
+                        "focus": last_focus,
+                        "attempts_remaining": processor.attempts_remaining,
+                    }
+                )
                 continue
 
             # ---------------------------------------------------------
@@ -226,9 +224,11 @@ async def attendance_websocket(
             )
 
             if frame is None:
-                await websocket.send_json({
-                    "error": "could not decode frame",
-                })
+                await websocket.send_json(
+                    {
+                        "error": "could not decode frame",
+                    }
+                )
                 continue
 
             tracks = []
@@ -239,11 +239,13 @@ async def attendance_websocket(
                 last_tracks = []
                 last_focus = None
 
-                await websocket.send_json({
-                    "tracks": [],
-                    "focus": None,
-                    "attempts_remaining": processor.attempts_remaining,
-                })
+                await websocket.send_json(
+                    {
+                        "tracks": [],
+                        "focus": None,
+                        "attempts_remaining": processor.attempts_remaining,
+                    }
+                )
 
             else:
                 # -----------------------------------------------------
@@ -288,19 +290,21 @@ async def attendance_websocket(
                         kpss,
                     )
 
-                    tracks.append({
-                        "track_id": track_id,
-                        "bbox": buffalo_box[:4].tolist(),
-                        "similarity": processor.track_sims.get(track_id),
-                        "streak": processor.track_streaks.get(
-                            track_id,
-                            0,
-                        ),
-                        "spoof": processor.track_spoof.get(
-                            track_id,
-                            False,
-                        ),
-                    })
+                    tracks.append(
+                        {
+                            "track_id": track_id,
+                            "bbox": buffalo_box[:4].tolist(),
+                            "similarity": processor.track_sims.get(track_id),
+                            "streak": processor.track_streaks.get(
+                                track_id,
+                                0,
+                            ),
+                            "spoof": processor.track_spoof.get(
+                                track_id,
+                                False,
+                            ),
+                        }
+                    )
 
                     # -------------------------------------------------
                     # If already locked, only submit that track.
@@ -332,10 +336,7 @@ async def attendance_websocket(
                 # -----------------------------------------------------
                 # Submit the largest Buffalo face while unlocked.
                 # -----------------------------------------------------
-                if (
-                    locked_track_id is None
-                    and candidate_for_submit is not None
-                ):
+                if locked_track_id is None and candidate_for_submit is not None:
                     box, kps, track_id = candidate_for_submit
 
                     processor.submit(
@@ -348,9 +349,7 @@ async def attendance_websocket(
                 # -----------------------------------------------------
                 # Tell the processor which ByteTrack IDs are visible.
                 # -----------------------------------------------------
-                processor.note_visible_tracks(
-                    visible_track_ids
-                )
+                processor.note_visible_tracks(visible_track_ids)
 
                 # -----------------------------------------------------
                 # Determine focus track.
@@ -374,11 +373,13 @@ async def attendance_websocket(
                     else None
                 )
 
-                await websocket.send_json({
-                    "tracks": last_tracks,
-                    "focus": last_focus,
-                    "attempts_remaining": processor.attempts_remaining,
-                })
+                await websocket.send_json(
+                    {
+                        "tracks": last_tracks,
+                        "focus": last_focus,
+                        "attempts_remaining": processor.attempts_remaining,
+                    }
+                )
 
             # ---------------------------------------------------------
             # Spoof protection
@@ -401,13 +402,15 @@ async def attendance_websocket(
                     longitude,
                 )
 
-                await websocket.send_json({
-                    "confirmed": {
-                        "track_id": processor.confirm_track_id,
-                        "similarity": processor.confirm_similarity,
-                        "timetable_id": timetable_id,
-                    },
-                })
+                await websocket.send_json(
+                    {
+                        "confirmed": {
+                            "track_id": processor.confirm_track_id,
+                            "similarity": processor.confirm_similarity,
+                            "timetable_id": timetable_id,
+                        },
+                    }
+                )
 
                 await websocket.close(
                     code=1000,

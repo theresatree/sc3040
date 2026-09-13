@@ -1,6 +1,7 @@
 from fastapi import HTTPException
 
-from app.ml.operations import get_face_embedding, check_spoofing
+from app.ml.operations import check_spoofing, get_face_embedding
+
 
 def process_face_image(state, image_bytes: bytes) -> list[float]:
     """Decode, detect, embed and anti-spoof a face image from a request.
@@ -32,4 +33,3 @@ def process_face_image(state, image_bytes: bytes) -> list[float]:
         )
 
     return embeddings
-

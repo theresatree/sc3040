@@ -1,9 +1,9 @@
 import random
 from datetime import time
-from app.db.database import SessionLocal
 
-from app.db.models import Timetable, DayOfWeek
 from tqdm import tqdm
+
+from app.db.models import DayOfWeek, Timetable
 
 WEEKDAYS = [
     DayOfWeek.MONDAY,
@@ -38,7 +38,7 @@ def overlaps(start1, end1, start2, end2):
 
 
 def has_collision(
-    professor_id,
+    staff_id,
     room_id,
     day,
     start,
@@ -50,56 +50,60 @@ def has_collision(
             continue
 
         # Professor already teaching during this time
-        if timetable.professor_id == professor_id:
-            if overlaps(start, end, timetable.start, timetable.end):
-                return True
+        if timetable.staff_id == staff_id and overlaps(
+            start, end, timetable.start, timetable.end
+        ):
+            return True
 
         # Room already occupied during this time
-        if timetable.room_id == room_id:
-            if overlaps(start, end, timetable.start, timetable.end):
-                return True
+        if timetable.room_id == room_id and overlaps(
+            start, end, timetable.start, timetable.end
+        ):
+            return True
 
     return False
 
 
-async def seed(professors, rooms):
-    async with SessionLocal() as db:
-        timetables = []
+async def seed(db, staffs, rooms):
+    rng = random.Random(0)
 
-        print("Subjects")
-        for i, subject in enumerate(SUBJECTS, 1):
-            print(f"{i}. {subject}")
+    timetables = []
 
-        for subject in tqdm(SUBJECTS, desc="Allocating timetables"):
-            # A professor can teach multiple subjects
-            professor = random.choice(professors)
+    print("Subjects")
+    for i, subject in enumerate(SUBJECTS, 1):
+        print(f"{i}. {subject}")
 
-            # Keep trying random combinations until there is no collision
-            while True:
-                day = random.choice(WEEKDAYS)
-                room = random.choice(rooms)
-                start, end = random.choice(TIME_SLOTS)
+    for subject in tqdm(SUBJECTS, desc="Allocating timetables"):
+        # A staff can teach multiple subjects
+        staff = rng.choice(staffs)
 
-                if not has_collision(
-                    professor.id,
-                    room.id,
-                    day,
-                    start,
-                    end,
-                    timetables,
-                ):
-                    break
+        # Keep trying random combinations until there is no collision
+        while True:
+            day = rng.choice(WEEKDAYS)
+            room = rng.choice(rooms)
+            start, end = rng.choice(TIME_SLOTS)
 
-            timetables.append(
-                Timetable(
-                    subject=subject,
-                    start=start,
-                    end=end,
-                    day_of_week=day,
-                    professor_id=professor.id,
-                    room_id=room.id,
-                )
+            if not has_collision(
+                staff.id,
+                room.id,
+                day,
+                start,
+                end,
+                timetables,
+            ):
+                break
+
+        timetables.append(
+            Timetable(
+                subject=subject,
+                start=start,
+                end=end,
+                day_of_week=day,
+                staff_id=staff.id,
+                room_id=room.id,
             )
+        )
+
     db.add_all(timetables)
     await db.commit()
 
